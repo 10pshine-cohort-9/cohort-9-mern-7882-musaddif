@@ -10,8 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.env*
+!.env.example
 *.local
-.env
 TASKS.md
 
 # Editor directories and files
@@ -24,3 +25,4 @@ TASKS.md
 *.njsproj
 *.sln
 *.sw?
+
