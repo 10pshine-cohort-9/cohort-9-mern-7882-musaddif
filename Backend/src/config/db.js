@@ -15,13 +15,12 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'postgres',
 });
 
-// Utility to verify database connection and initialize tables on startup
 export const testDbConnection = async () => {
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     const result = await client.query('SELECT NOW()');
     console.log(`[Database] PostgreSQL connected successfully at ${result.rows[0].now}`);
-
     // Auto-create database tables from schema.sql if they don't exist
     const schemaPath = path.join(process.cwd(), 'src', 'config', 'schema.sql');
     if (fs.existsSync(schemaPath)) {
@@ -29,13 +28,12 @@ export const testDbConnection = async () => {
       await client.query(schemaSql);
       console.log('[Database] Database tables initialized successfully.');
     }
-
-    client.release();
     return true;
   } catch (error) {
     console.error(`[Database Error] PostgreSQL connection failed: ${error.message}`);
     return false;
+  } finally {
+    client?.release();
   }
-};
-
+}
 export default pool;

@@ -50,10 +50,8 @@ export const register = async (req, res, next) => {
 
     const user = newUserResult.rows[0];
 
-    // 6. Generate JWT Token
     const token = generateToken(user.id);
 
-    // 7. Send Response (never expose password_hash)
     return res.status(201).json({
       success: true,
       message: 'User registered successfully.',
@@ -71,15 +69,12 @@ export const register = async (req, res, next) => {
   }
 };
 
-/**
- * Login existing user
- * POST /api/auth/login
- */
+
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Email and password are required.',
@@ -88,7 +83,6 @@ export const login = async (req, res, next) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // 1. Find user by email
     const userResult = await pool.query(
       'SELECT id, name, email, password_hash, avatar_url FROM users WHERE email = $1',
       [normalizedEmail]
@@ -233,84 +227,81 @@ export const forgotPassword = async (req, res, next) => {
  * POST /api/auth/reset-password
  */
 export const resetPassword = async (req, res, next) => {
+  const client = await pool.connect();
+
   try {
     const { token, password } = req.body;
 
-    if (!token || typeof token !== 'string') {
+    if (!token || typeof token !== "string") {
       return res.status(400).json({
         success: false,
-        message: 'Reset token is required.',
+        message: "Reset token is required.",
       });
     }
 
     const passErr = validatePassword(password);
     if (passErr) {
-      return res.status(400).json({ success: false, message: passErr });
+      return res.status(400).json({
+        success: false,
+        message: passErr,
+      });
     }
 
-    // Hash incoming raw token to compare against database
     const tokenHash = hashResetToken(token);
 
-    // Find reset token entry
-    const tokenResult = await pool.query(
-      `SELECT id, user_id, expires_at, used_at
-       FROM password_reset_tokens
-       WHERE token_hash = $1`,
+    await client.query("BEGIN");
+
+    // Atomically claim the token
+    const tokenResult = await client.query(
+      `
+      UPDATE password_reset_tokens
+      SET used_at = CURRENT_TIMESTAMP
+      WHERE token_hash = $1
+        AND used_at IS NULL
+        AND expires_at > CURRENT_TIMESTAMP
+      RETURNING id, user_id
+      `,
       [tokenHash]
     );
 
     if (tokenResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired password reset token.',
+        message: "Invalid, expired, or already used password reset token.",
       });
     }
 
-    const resetRecord = tokenResult.rows[0];
+    const { user_id } = tokenResult.rows[0];
 
-    // Check if token has already been used
-    if (resetRecord.used_at) {
-      return res.status(400).json({
-        success: false,
-        message: 'This reset token has already been used.',
-      });
-    }
-
-    // Check token expiration
-    const now = new Date();
-    if (new Date(resetRecord.expires_at) < now) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password reset token has expired.',
-      });
-    }
-
-    // Hash new password
+    // Hash the new password
     const saltRounds = 10;
     const newPasswordHash = await bcrypt.hash(password, saltRounds);
 
-    // Update user password
-    await pool.query(
-      `UPDATE users
-       SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [newPasswordHash, resetRecord.user_id]
+    // Update user's password
+    await client.query(
+      `
+      UPDATE users
+      SET password_hash = $1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      `,
+      [newPasswordHash, user_id]
     );
 
-    // Mark token as used
-    await pool.query(
-      `UPDATE password_reset_tokens
-       SET used_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [resetRecord.id]
-    );
+    await client.query("COMMIT");
 
     return res.status(200).json({
       success: true,
-      message: 'Password reset successful. You can now log in with your new password.',
+      message:
+        "Password reset successful. You can now log in with your new password.",
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     next(error);
+  } finally {
+    client.release();
   }
 };
 

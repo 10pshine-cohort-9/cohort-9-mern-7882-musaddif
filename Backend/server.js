@@ -6,15 +6,24 @@ dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 
-// Start Server after checking DB Connection
 const startServer = async () => {
-  console.log('[Server] Starting Notes Backend...');
-  await testDbConnection();
+  try {
+    console.log("[Server] Starting Notes Backend...");
 
-  app.listen(PORT, () => {
-    console.log(`[Server] Express server running on port ${PORT}`);
-    console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
-  });
+    const dbReady = await testDbConnection();
+
+    if (!dbReady) {
+      console.error("[Server] Database is unavailable.");
+      process.exit(1);
+    }
+
+    app.listen(PORT, () => {
+      console.log(`[Server] Express server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("[Server] Failed to start:", error);
+    process.exit(1);
+  }
 };
 
 startServer();
