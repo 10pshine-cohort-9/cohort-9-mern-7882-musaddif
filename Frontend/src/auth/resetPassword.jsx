@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
-import { ArrowLeft, CheckCircle2, Lock, NotebookPen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock, NotebookPen ,Eye, EyeOff,} from "lucide-react";
 import { resetPasswordUser, clearAuthError } from "../store/slices/authSlice";
 import "./forgot.css";
 
@@ -106,6 +106,13 @@ function ResetPassword() {
                           onChange={(e) => setPassword(e.target.value)}
                           required
                         />
+                        <button
+                          type="button"
+                         onClick={() => setShowPassword(!showPassword)}
+                       aria-label="Toggle password visibility"
+                     >
+                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
                       </div>
                     </div>
 

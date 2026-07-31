@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
-import { ArrowLeft, CheckCircle2, Lock, Mail, NotebookPen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock, Mail, NotebookPen, ArrowLeftIcon } from "lucide-react";
 import { forgotPasswordUser, clearAuthError } from "../store/slices/authSlice";
 import "./forgot.css";
 

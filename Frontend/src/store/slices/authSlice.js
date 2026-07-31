@@ -10,9 +10,7 @@ export const registerUser = createAsyncThunk(
         method: 'POST',
         body: JSON.stringify(userData),
       });
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
+      // Token is now set via httpOnly cookie - no localStorage needed
       return data;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -28,9 +26,7 @@ export const loginUser = createAsyncThunk(
         method: 'POST',
         body: JSON.stringify(credentials),
       });
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
+      // Token is now set via httpOnly cookie - no localStorage needed
       return data;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -47,7 +43,7 @@ export const fetchCurrentUser = createAsyncThunk(
       });
       return data;
     } catch (error) {
-      localStorage.removeItem('token');
+      // Token validation failed - clear session
       return rejectWithValue(error.message);
     }
   }
@@ -91,22 +87,34 @@ export const logoutUser = createAsyncThunk(
     } catch (error) {
       // Proceed with local logout regardless of server errors
     } finally {
-      localStorage.removeItem('token');
       dispatch(clearSession());
     }
   }
 );
 
-const initialToken = localStorage.getItem('token') || null;
+// Check authentication status on app load
+export const checkAuthStatus = createAsyncThunk(
+  'auth/checkAuthStatus',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await apiFetch('/auth/me', {
+        method: 'GET',
+      });
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
 
+// Initial state - token is managed by httpOnly cookie
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
     user: null,
-    token: initialToken,
-    isAuthenticated: !!initialToken,
+    isAuthenticated: false,
     loading: false,
-    initialCheckDone: !initialToken, // if no token, initial check is done immediately
+    initialCheckDone: false,
     error: null,
     message: null,
   },
@@ -119,13 +127,11 @@ const authSlice = createSlice({
     },
     clearSession: (state) => {
       state.user = null;
-      state.token = null;
       state.isAuthenticated = false;
       state.loading = false;
       state.error = null;
       state.message = null;
       state.initialCheckDone = true;
-      localStorage.removeItem('token');
     },
   },
   extraReducers: (builder) => {
@@ -139,7 +145,6 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.token = action.payload.token;
         state.isAuthenticated = true;
         state.message = action.payload.message;
       })
@@ -156,7 +161,6 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.token = action.payload.token;
         state.isAuthenticated = true;
         state.message = action.payload.message;
       })
@@ -177,7 +181,22 @@ const authSlice = createSlice({
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.loading = false;
         state.user = null;
-        state.token = null;
+        state.isAuthenticated = false;
+        state.initialCheckDone = true;
+      })
+      // Check Auth Status (on app load)
+      .addCase(checkAuthStatus.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(checkAuthStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+        state.initialCheckDone = true;
+      })
+      .addCase(checkAuthStatus.rejected, (state) => {
+        state.loading = false;
+        state.user = null;
         state.isAuthenticated = false;
         state.initialCheckDone = true;
       })

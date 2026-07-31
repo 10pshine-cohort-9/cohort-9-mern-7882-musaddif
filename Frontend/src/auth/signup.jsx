@@ -254,6 +254,7 @@ function Signup() {
                     <button
                       type="button"
                       className="signup-password-button"
+                       aria-label="Toggle password visibility"
                       onClick={() =>
                         setShowPassword(!showPassword)
                       }
