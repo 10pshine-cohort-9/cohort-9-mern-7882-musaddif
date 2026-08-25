@@ -1,18 +1,34 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
+import { useDispatch, useSelector } from "react-redux";
 import { ArrowLeft, CheckCircle2, Lock, Mail, NotebookPen, ArrowLeftIcon } from "lucide-react";
+import { forgotPassword } from "../store/thunk/authThunk";
+import { clearError } from "../store/slice/authSlice";
 import "./forgot.css";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    const trimmedEmail = email.trim();
 
-    console.log("Email submitted:", email);
-   
+    if (!trimmedEmail) return;
+
+    try {
+      await dispatch(forgotPassword(trimmedEmail)).unwrap();
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Forgot password failed:", err);
+      setSubmitted(false);
+    }
   };
 
   return (
@@ -138,18 +154,23 @@ function ForgotPassword() {
                           type="email"
                           placeholder="Enter your email"
                           value={email}
-                          onChange={(e) =>
-                            setEmail(e.target.value)
-                          }
+                          onChange={(e) => setEmail(e.target.value)}
                           required
+                          disabled={loading}
                         />
                       </div>
                     </div>
+                    {error && (
+                      <p className="forgot-error-message" role="alert">
+                        {error}
+                      </p>
+                    )}
                     <button
                       type="submit"
                       className="forgot-submit-button"
+                      disabled={loading}
                     >
-                      Send reset link
+                      {loading ? "Sending..." : "Send reset link"}
                     </button>
                   </form>
                   <Link

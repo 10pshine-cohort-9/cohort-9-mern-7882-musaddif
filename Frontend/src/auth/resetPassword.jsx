@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 import { ArrowLeft, CheckCircle2, Lock, NotebookPen ,Eye, EyeOff,} from "lucide-react";
+import { resetPassword } from "../store/thunk/authThunk";
+import { clearError } from "../store/slice/authSlice";
 import "./forgot.css";
 
 function ResetPassword() {
@@ -15,13 +17,12 @@ function ResetPassword() {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    return () => {
-      console.log("ResetPassword component unmounted, clearing local error.");
-    };
-  }, []);
+    dispatch(clearError());
+  }, [dispatch]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,19 +33,28 @@ function ResetPassword() {
       return;
     }
 
+    if (password.trim().length < 6) {
+      setLocalError("Password must be at least 6 characters long.");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setLocalError("Passwords do not match.");
       return;
     }
 
-  console.log("Resetting password with token:", token, "and new password:",)
+    try {
+      await dispatch(resetPassword({ token, password })).unwrap();
+      setResetSuccess(true);
+    } catch (err) {
+      console.error("Password reset failed:", err);
+    }
   };
 
   return (
     <div className="forgot-page">
       <div className="forgot-container">
 
-        {/* LEFT SIDE */}
         <section className="forgot-left">
           <div className="forgot-left-content">
             <div className="forgot-logo">
@@ -67,7 +77,6 @@ function ResetPassword() {
           </div>
         </section>
 
-        {/* RIGHT SIDE */}
         <section className="forgot-right">
           <div className="forgot-form-wrapper">
             <div className="forgot-card">

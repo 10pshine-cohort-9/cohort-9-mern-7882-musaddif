@@ -2,21 +2,34 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 import { NotebookPen, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { loginUser } from "../store/thunk/authThunk";
+import { clearError } from "../store/slice/authSlice";
+
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-
+  
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { loading, error } = useSelector((state) => state.auth);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-  if (email && password) {
-    localStorage.setItem("isAuthenticated", "true");
-    navigate("/notes");
-  }
+    if (email && password) {
+      try {
+        await dispatch(loginUser({ email, password })).unwrap();
+        const redirectPath = window.location.pathname === "/login" ? "/notes" : "/notes";
+        navigate(redirectPath, { replace: true });
+      } catch (err) {
+        console.error("Login failed:", err);
+      }
+    }
   };
 
   return (
@@ -218,11 +231,29 @@ function Login() {
                     </button>
                   </div>
                 </div>
-                  <button
+
+                {error && (
+                  <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                    {error}
+                  </div>
+                )}
+
+                <button
                   type="submit"
-                  className="h-12 w-full rounded-xl bg-purple-600 text-sm font-semibold text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 hover:shadow-purple-300 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={loading}
+                  className="h-12 w-full rounded-xl bg-purple-600 text-sm font-semibold text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 hover:shadow-purple-300 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  Sign in
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Signing in...
+                    </span>
+                  ) : (
+                    "Sign in"
+                  )}
                 </button>
               </form>
 

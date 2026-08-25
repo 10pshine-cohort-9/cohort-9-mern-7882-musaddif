@@ -1,11 +1,23 @@
 import { useSelector, useDispatch } from "react-redux";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
+import { logoutUser } from "../store/thunk/authThunk";
+import { logout } from "../store/slice/authSlice";
 
 function NotesPage() {
-const handleLogout = () => {
-  localStorage.removeItem("isAuthenticated");
-  navigate("/login", { replace: true });
-};
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth || {});
+
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap().catch(() => undefined);
+    } catch (error) {
+      console.error("Server logout failed:", error);
+    } finally {
+      dispatch(logout());
+      navigate("/login", { replace: true });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#faf9ff] text-slate-900">
@@ -21,8 +33,8 @@ const handleLogout = () => {
 
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-semibold text-slate-800">{ "User"}</p>
-              <p className="text-xs text-slate-500">{ ""}</p>
+              <p className="text-sm font-semibold text-slate-800">{user?.name || "User"}</p>
+              <p className="text-xs text-slate-500">{user?.email || ""}</p>
             </div>
 
             <button
@@ -38,24 +50,24 @@ const handleLogout = () => {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="text-3xl font-bold text-slate-900">Welcome back, { "User"}! 👋</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Welcome back, {user?.name || "User"}! 👋</h1>
           <p className="mt-2 text-slate-600">Your authentication with Express backend & Redux Toolkit is fully working.</p>
 
           <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-6">
               <h3 className="font-semibold text-purple-900">User ID</h3>
-              <p className="mt-1 text-sm text-purple-700 font-mono">{ "N/A"}</p>
+              <p className="mt-1 text-sm text-purple-700 font-mono">{user?._id || "N/A"}</p>
             </div>
 
             <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-6">
               <h3 className="font-semibold text-purple-900">Email Address</h3>
-              <p className="mt-1 text-sm text-purple-700">{ "N/A"}</p>
+              <p className="mt-1 text-sm text-purple-700">{user?.email || "N/A"}</p>
             </div>
 
             <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-6">
               <h3 className="font-semibold text-purple-900">Account Created</h3>
               <p className="mt-1 text-sm text-purple-700">
-                { "N/A" }
+                {"N/A"}
               </p>
             </div>
           </div>
