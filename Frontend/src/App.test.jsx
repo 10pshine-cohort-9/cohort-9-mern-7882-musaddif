@@ -1,6 +1,7 @@
 // src/App.test.jsx
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
@@ -144,5 +145,40 @@ describe('App Authentication Logic', () => {
       </Provider>
     );
    
+  });
+});
+
+describe('Notes trash actions', () => {
+  it('shows only trashed notes and can restore or permanently delete them', async () => {
+    vi.doUnmock('./pages/notes');
+    const { default: NotesPage } = await import('./pages/notes');
+    const user = userEvent.setup();
+
+    render(
+      <Provider store={createTestStore({ token: 'fake-token', user: { id: 1 } })}>
+        <BrowserRouter>
+          <NotesPage />
+        </BrowserRouter>
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /trash/i }));
+
+    expect(screen.getByRole('heading', { name: 'Trash' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Code Snippets' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Books to Read' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Project Ideas' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Options for Code Snippets' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
+
+    expect(screen.queryByRole('heading', { name: 'Code Snippets' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /trash/i }));
+    await user.click(screen.getByRole('button', { name: 'Options for Books to Read' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete permanently' }));
+
+    expect(screen.queryByRole('heading', { name: 'Books to Read' })).not.toBeInTheDocument();
   });
 });
