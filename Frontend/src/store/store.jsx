@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { persistReducer, persistStore } from 'redux-persist';
 import { combineReducers } from 'redux';
 import authReducer from './slice/authSlice';
+import noteReducer from './slice/noteSlice';
 
 // Custom storage wrapper to avoid Vite module resolution issues with redux-persist
 const customStorage = {
@@ -24,7 +25,7 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
     auth: persistReducer(persistConfig, authReducer),
-    // add other reducers here when needed
+    notes: noteReducer,
 });
 
 export const store = configureStore({

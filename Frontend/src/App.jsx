@@ -12,7 +12,6 @@ import { ProtectedRoute, PublicRoute } from "./components/ProtectedRoute";
 
 function App() {
   const { token } = useSelector((state) => state.auth);
-  console.log("Token in App.jsx:", token); 
   const isAuthenticated = Boolean(token);
 
   return (

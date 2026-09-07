@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
-import { NotebookPen, UserRound, Mail, Lock, Eye, EyeOff, LockIcon  } from "lucide-react";
+import { NotebookPen, UserRound, Mail, Eye, EyeOff, LockIcon  } from "lucide-react";
 import { registerUser } from "../store/thunk/authThunk";
 import { clearError } from "../store/slice/authSlice";
 import "./signup.css";

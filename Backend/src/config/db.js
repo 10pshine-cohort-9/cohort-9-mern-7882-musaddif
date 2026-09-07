@@ -2,6 +2,7 @@ import pg from 'pg';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -16,24 +17,31 @@ const pool = new Pool({
 });
 
 // Utility to verify database connection and initialize tables on startup
-export const testDbConnection = async () => {
+export const testDbConnection = async (dbNameOverride) => {
+  let client;
   try {
-    const client = await pool.connect();
+    const targetPool = dbNameOverride ? new Pool({ ...pool.options, database: dbNameOverride }) : pool;
+    client = await targetPool.connect();
     const result = await client.query('SELECT NOW()');
-    console.log(`[Database] PostgreSQL connected successfully at ${result.rows[0].now}`);
+    logger.info(`PostgreSQL connected successfully at ${result.rows[0].now}`);
 
-    // Auto-create database tables from schema.sql if they don't exist
-    const schemaPath = path.join(process.cwd(), 'src', 'config', 'schema.sql');
-    if (fs.existsSync(schemaPath)) {
-      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-      await client.query(schemaSql);
-      console.log('[Database] Database tables initialized successfully.');
+    if (!dbNameOverride) {
+      // Auto-create database tables from schema.sql if they don't exist
+      const schemaPath = path.join(process.cwd(), 'src', 'config', 'schema.sql');
+      if (fs.existsSync(schemaPath)) {
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+        await client.query(schemaSql);
+        logger.info('Database tables initialized successfully.');
+      }
     }
 
     client.release();
     return true;
   } catch (error) {
-    console.error(`[Database Error] PostgreSQL connection failed: ${error.message}`);
+    logger.error({ err: error }, 'PostgreSQL connection failed');
+    if (client) {
+      client.release();
+    }
     return false;
   }
 };

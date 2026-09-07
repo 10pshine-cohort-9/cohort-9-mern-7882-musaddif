@@ -24,8 +24,7 @@ function Login() {
     if (email && password) {
       try {
         await dispatch(loginUser({ email, password })).unwrap();
-        const redirectPath = window.location.pathname === "/login" ? "/notes" : "/notes";
-        navigate(redirectPath, { replace: true });
+        navigate("/notes", { replace: true });
       } catch (err) {
         console.error("Login failed:", err);
       }

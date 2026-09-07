@@ -8,3 +8,8 @@ build/
 .DS_Store
 .vscode/
 .idea/
+
+# Coverage & analysis artifacts
+coverage/
+.nyc_output/
+.scannerwork/

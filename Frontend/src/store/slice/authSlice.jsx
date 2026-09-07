@@ -109,7 +109,7 @@ const authSlice = createSlice({
                 state.successMessage = null;
                 clearPersistedAuth();
             })
-            .addCase(logoutUser.rejected, (state, action) => {
+            .addCase(logoutUser.rejected, (state) => {
                 state.user = null;
                 state.token = null;
                 state.error = null;

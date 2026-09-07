@@ -1,12 +1,14 @@
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { stripHtml } from "../utils/text";
 
 function NoteCard({ note, isTrashView = false, onTrash, onRestore, onDeletePermanently }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const navigate = useNavigate();
   const Icon = note.icon;
+  const previewContent = stripHtml(note.content).slice(0, 200);
 
   return (
     <article className={`note-card note-card-${note.theme}`}
@@ -40,12 +42,32 @@ function NoteCard({ note, isTrashView = false, onTrash, onRestore, onDeletePerma
         </div>
       </div>
       <h2>{note.title}</h2>
-      <p className="note-description">{note.content}</p>
+      <p className="note-description">{previewContent}</p>
       <div className="note-card-footer">
         <span className={`note-tag note-tag-${note.theme}`}>{note.category}</span>
         <time>{note.time}</time>
       </div>
-      {confirmingDelete && <div className="delete-modal-backdrop" role="presentation" onClick={(event) => event.stopPropagation()}><div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby={`delete-${note.id}`}><h2 id={`delete-${note.id}`}>{isTrashView ? "Delete permanently?" : "Move to trash?"}</h2><p>{isTrashView ? "This note will be deleted permanently and cannot be recovered." : "The note will be moved to trash."}</p><div><button type="button" onClick={() => setConfirmingDelete(false)}>Cancel</button><button className="delete-confirm" type="button" onClick={() => { if (isTrashView) onDeletePermanently(note.id); else onTrash(note.id); setConfirmingDelete(false); }}> {isTrashView ? "Delete permanently" : "Move to trash"}</button></div></div></div>}
+      {confirmingDelete && (
+        <div className="delete-modal-backdrop" role="presentation" onClick={(event) => event.stopPropagation()}>
+          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby={`delete-${note.id}`}>
+            <h2 id={`delete-${note.id}`}>{isTrashView ? "Delete permanently?" : "Move to trash?"}</h2>
+            <p>{isTrashView ? "This note will be deleted permanently and cannot be recovered." : "The note will be moved to trash."}</p>
+            <div>
+              <button type="button" onClick={() => setConfirmingDelete(false)}>Cancel</button>
+              <button className="delete-confirm" type="button" onClick={() => {
+                if (isTrashView) {
+                  onDeletePermanently(note.id);
+                } else {
+                  onTrash(note.id);
+                }
+                setConfirmingDelete(false);
+              }}>
+                {isTrashView ? "Delete permanently" : "Move to trash"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

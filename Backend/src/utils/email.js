@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import logger from './logger.js';
 
 dotenv.config();
 
@@ -24,21 +25,19 @@ const transporter = nodemailer.createTransport({
 });
 
 if (process.env.NODE_ENV === 'development') {
-  console.log(`[Email] SMTP configured host=${smtpHost} port=${smtpPort} user=${smtpUser ? smtpUser : '<none>'}`);
+  logger.info(`SMTP configured host=${smtpHost} port=${smtpPort} user=${smtpUser ? smtpUser : '<none>'}`);
 }
 
 // Verify transporter connection early and log safe info with non-secret details
 transporter.verify((err, success) => {
   if (err) {
-    console.error('[Email Error] SMTP verification failed:', err && err.message ? err.message : err);
-    if (err && err.code) console.error('[Email Error] code:', err.code);
-    if (err && err.response) console.error('[Email Error] response:', err.response);
+    logger.error({ err }, 'SMTP verification failed');
     // Common hints
-    if (err && (err.code === 'EAUTH' || err.response && /Authentication failed/i.test(err.response))) {
-      console.error('[Email Hint] Authentication failed. Ensure you are using a Gmail App Password and that it is set as EMAIL_PASSWORD in .env (no spaces).');
+    if (err.code === 'EAUTH' || (err.response && /Authentication failed/i.test(err.response))) {
+      logger.error('SMTP Hint: Authentication failed. Ensure you are using a Gmail App Password and that it is set as EMAIL_PASSWORD in .env (no spaces).');
     }
   } else {
-    console.log('[Email] SMTP transporter verified');
+    logger.info('SMTP transporter verified');
   }
 });
 
@@ -96,12 +95,10 @@ export const sendPasswordResetEmail = async (toEmail, resetUrl) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     // Log a safe confirmation without exposing secrets
-    console.log(`[Email] Password reset email queued for ${toEmail}. MessageId: ${info.messageId}`);
+    logger.info({ toEmail, messageId: info.messageId }, 'Password reset email queued');
     return info;
   } catch (err) {
-    console.error('[Email Error] Failed to send password reset email to', toEmail, '-', err && err.message ? err.message : err);
-    if (err && err.code) console.error('[Email Error] code:', err.code);
-    if (err && err.response) console.error('[Email Error] response:', err.response);
+    logger.error({ err, toEmail }, 'Failed to send password reset email');
     throw err;
   }
 };

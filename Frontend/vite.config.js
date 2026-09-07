@@ -23,5 +23,15 @@ export default defineConfig({
     globals: true, // Makes Vitest APIs available globally
     environment: 'jsdom', // Uses jsdom to simulate a browser environment
     setupFiles: './src/setupTests.js', // Points to a file that runs before each test
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/**/*.test.{js,jsx}',
+        'src/setupTests.js',
+        'src/main.jsx',
+      ],
+    },
   },
 });

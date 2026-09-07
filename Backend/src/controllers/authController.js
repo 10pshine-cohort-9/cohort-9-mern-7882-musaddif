@@ -3,6 +3,7 @@ import pool from '../config/db.js';
 import { generateToken, generateResetToken, hashResetToken } from '../utils/token.js';
 import { validateName, validateEmail, validatePassword } from '../utils/validation.js';
 import { sendPasswordResetEmail } from '../utils/email.js';
+import logger from '../utils/logger.js';
 
 
 /**
@@ -52,6 +53,8 @@ export const register = async (req, res, next) => {
 
     // 6. Generate JWT Token
     const token = generateToken(user.id);
+
+    logger.info({ userId: user.id }, 'User registered successfully');
 
     // 7. Send Response (never expose password_hash)
     return res.status(201).json({
@@ -117,6 +120,8 @@ export const login = async (req, res, next) => {
     // 3. Generate JWT Token
     const token = generateToken(user.id);
 
+    logger.info({ userId: user.id }, 'User logged in successfully');
+
     // 4. Return safe user payload
     return res.status(200).json({
       success: true,
@@ -176,10 +181,8 @@ export const getMe = async (req, res, next) => {
  * POST /api/auth/forgot-password
  */
 export const forgotPassword = async (req, res, next) => {
-  
   try {
     const { email } = req.body;
-console.log("email:", email);
 
     const emailErr = validateEmail(email);
     if (emailErr) {
@@ -190,16 +193,14 @@ console.log("email:", email);
 
     // Check if user exists
     const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
-      console.log('[Auth] forgotPassword request for:', normalizedEmail);
 
-      if (userResult.rows.length > 0) {
-        const user = userResult.rows[0];
-        console.log('[Auth] User found for forgot-password:', { id: user.id, email: normalizedEmail });
+    if (userResult.rows.length > 0) {
+      const user = userResult.rows[0];
+      logger.info({ userId: user.id }, 'Password reset requested for existing user');
 
       // Generate raw reset token and token hash (do not log raw token)
       const rawToken = generateResetToken();
       const tokenHash = hashResetToken(rawToken);
-      console.log('[Auth] Generated password reset token hash for user id:', user.id);
 
       // Expiration set to 15 minutes from now
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
@@ -216,17 +217,10 @@ console.log("email:", email);
       const resetUrl = `${clientUrl}/reset-password?token=${rawToken}`;
 
       try {
-        console.log('[Auth] Attempting to send password reset email to:', normalizedEmail);
         const info = await sendPasswordResetEmail(normalizedEmail, resetUrl);
-        if (info && info.messageId) {
-          console.log('[Auth] sendPasswordResetEmail succeeded:', { to: normalizedEmail, messageId: info.messageId });
-        } else {
-          console.log('[Auth] sendPasswordResetEmail resolved without messageId for', normalizedEmail);
-        }
+        logger.info({ userId: user.id, messageId: info && info.messageId }, 'Password reset email sent');
       } catch (emailError) {
-        console.error('[Auth][Email Error] Failed to send password reset email to', normalizedEmail, '-', emailError && emailError.message ? emailError.message : emailError);
-        if (emailError && emailError.code) console.error('[Auth][Email Error] code:', emailError.code);
-        if (emailError && emailError.response) console.error('[Auth][Email Error] response:', emailError.response);
+        logger.error({ err: emailError, userId: user.id }, 'Failed to send password reset email');
         // Don't block the response if email fails — log for debugging
       }
     }
