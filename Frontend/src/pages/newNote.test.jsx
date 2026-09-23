@@ -26,6 +26,12 @@ vi.mock('../store/slice/noteSlice', () => ({
   clearCurrentNote: vi.fn(() => ({ type: 'notes/clear' })),
 }));
 
+vi.mock('../store/thunk/aiThunk', () => ({
+  checkGrammar: vi.fn(() => () => ({
+    unwrap: () => Promise.resolve({ success: true, data: { originalText: 'My note body', correctedText: 'Corrected body' } }),
+  })),
+}));
+
 vi.mock('../store/thunk/authThunk', () => ({
   logoutUser: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
 }));
@@ -138,5 +144,52 @@ describe('NewNotePage - edit mode', () => {
       expect.objectContaining({ id: '9', noteData: expect.objectContaining({ title: 'Updated Note' }) })
     );
     expect(await screen.findByTestId('notes-page')).toBeInTheDocument();
+  });
+});
+
+describe('NewNotePage - grammar check', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sends the full note text and replaces the editor content with the corrected text', async () => {
+    const user = userEvent.setup();
+    renderNewNote('/notes/new');
+
+    await user.type(screen.getByTestId('rich-text-editor'), 'My note body');
+    await user.click(screen.getByRole('button', { name: /Check Grammar/ }));
+
+    const { checkGrammar } = await import('../store/thunk/aiThunk');
+    expect(checkGrammar).toHaveBeenCalledWith('My note body');
+    expect(await screen.findByDisplayValue('Corrected body')).toBeInTheDocument();
+    const { createNote } = await import('../store/thunk/noteThunk');
+    expect(createNote).not.toHaveBeenCalled();
+  });
+
+  it('shows a validation message when the note is empty', async () => {
+    const user = userEvent.setup();
+    renderNewNote('/notes/new');
+
+    await user.click(screen.getByRole('button', { name: /Check Grammar/ }));
+
+    expect(await screen.findByText(/Please write some note content/)).toBeInTheDocument();
+    const { checkGrammar } = await import('../store/thunk/aiThunk');
+    expect(checkGrammar).not.toHaveBeenCalled();
+  });
+
+  it('shows an error and keeps the original text when the request fails', async () => {
+    const user = userEvent.setup();
+    const { checkGrammar } = await import('../store/thunk/aiThunk');
+    checkGrammar.mockImplementationOnce(() => () => ({
+      unwrap: () => Promise.reject('Failed to check grammar'),
+    }));
+
+    renderNewNote('/notes/new');
+    await user.type(screen.getByTestId('rich-text-editor'), 'Original text');
+    await user.click(screen.getByRole('button', { name: /Check Grammar/ }));
+
+    expect(await screen.findByText('Failed to check grammar')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Original text')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Check Grammar/ })).toBeEnabled();
   });
 });

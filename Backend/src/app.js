@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import noteRoutes from './routes/noteRoutes.js';
 import pool from './config/db.js';
 import logger from './utils/logger.js';
+import aiRoutes from './routes/aiRoutes.js';
 
 dotenv.config();
 
@@ -68,6 +69,8 @@ app.get('/api/health', async (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/notes', noteRoutes);
+app.use("/api/ai", aiRoutes);
+
 
 // 5. 404 Handler
 app.use((req, res) => {

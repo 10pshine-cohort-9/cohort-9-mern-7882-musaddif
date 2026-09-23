@@ -11,6 +11,7 @@
     "test:coverage": "cross-env NODE_ENV=test c8 mocha --require ./test/setup-env.cjs --exit --timeout 20000 \"test/**/*.test.js\""
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

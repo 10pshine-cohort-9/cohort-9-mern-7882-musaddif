@@ -23,9 +23,10 @@ function RichTextEditor({ value = "", onChange, placeholder = "Write your note h
   }, [onChange]);
 
   useEffect(() => {
-    if (!containerRef.current || quillRef.current) return;
+    const container = containerRef.current;
+    if (!container || quillRef.current) return;
 
-    const quill = new Quill(containerRef.current, {
+    const quill = new Quill(container, {
       theme: "snow",
       modules: {
         toolbar: TOOLBAR_OPTIONS,
@@ -52,6 +53,12 @@ function RichTextEditor({ value = "", onChange, placeholder = "Write your note h
 
     return () => {
       quillRef.current = null;
+      const toolbar = container.previousElementSibling;
+      if (toolbar && toolbar.classList.contains("ql-toolbar")) {
+        toolbar.remove();
+      }
+      container.classList.remove("ql-container");
+      container.innerHTML = "";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

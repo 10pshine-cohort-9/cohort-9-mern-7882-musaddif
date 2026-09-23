@@ -2,16 +2,17 @@ import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useParams } from "react-router";
 import {
-  ChevronDown, House, Menu, NotebookPen, Plus, Save, Tag, Trash2, UserRound, X, Eye,
+  ChevronDown, House, Menu, NotebookPen, Plus, Save, Sparkles, Tag, Trash2, UserRound, X, Eye,
   LogOut,
 } from "lucide-react";
 import { logoutUser } from "../store/thunk/authThunk";
 import { logout } from "../store/slice/authSlice";
 import { createNote, updateNote, getNoteById } from "../store/thunk/noteThunk";
+import { checkGrammar } from "../store/thunk/aiThunk";
 import { clearCurrentNote } from "../store/slice/noteSlice";
 import LogoutModal from "../components/LogoutModal";
 import RichTextEditor from "../components/RichTextEditor";
-import { sanitizeHtml } from "../utils/text";
+import { sanitizeHtml, stripHtml } from "../utils/text";
 import { categories } from "./notesData";
 import "./Notes.css";
 import "./NewNote.css";
@@ -19,6 +20,7 @@ import "./NewNote.css";
 const colors = ["purple", "blue", "green", "yellow", "red", "slate"];
 
 function NoteForm({ currentNote, loading, saveError, onSave }) {
+  const dispatch = useDispatch();
   const [title, setTitle] = useState(() => currentNote?.title || "");
   const [category, setCategory] = useState(() => currentNote?.category || "Personal");
   const [tags, setTags] = useState(() => currentNote?.tags || "");
@@ -26,6 +28,33 @@ function NoteForm({ currentNote, loading, saveError, onSave }) {
   const [color, setColor] = useState(() => currentNote?.theme || "purple");
   const [submitted, setSubmitted] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [checkingGrammar, setCheckingGrammar] = useState(false);
+  const [grammarError, setGrammarError] = useState(null);
+
+  const handleCheckGrammar = async () => {
+    const plainText = stripHtml(content).trim();
+    if (!plainText) {
+      setGrammarError("Please write some note content before checking grammar.");
+      return;
+    }
+
+    setCheckingGrammar(true);
+    setGrammarError(null);
+
+    try {
+      const result = await dispatch(checkGrammar(plainText)).unwrap();
+      const correctedText = result?.data?.correctedText;
+      if (correctedText) {
+        setContent(correctedText);
+      } else {
+        setGrammarError("No corrections were returned. Please try again.");
+      }
+    } catch (grammarErr) {
+      setGrammarError(grammarErr || "Failed to check grammar. Please try again.");
+    } finally {
+      setCheckingGrammar(false);
+    }
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -52,6 +81,7 @@ function NoteForm({ currentNote, loading, saveError, onSave }) {
           <div className="editor" aria-invalid={submitted && !content.trim()}>
             <RichTextEditor value={content} onChange={setContent} />
           </div>
+          {grammarError && <p className="form-error" role="alert">{grammarError}</p>}
         </div>
       <div className="note-options">
         <fieldset>
@@ -62,7 +92,10 @@ function NoteForm({ currentNote, loading, saveError, onSave }) {
         </fieldset>
       </div>
       <div className="form-actions">
-        <button className="preview-button" type="button" onClick={() => setShowPreview((visible) => !visible)}><Eye size={16} /> {showPreview ? "Edit" : "Preview"}</button>
+        <div className="form-actions-left">
+          <button className="preview-button" type="button" onClick={() => setShowPreview((visible) => !visible)}><Eye size={16} /> {showPreview ? "Edit" : "Preview"}</button>
+          <button className="grammar-button" type="button" onClick={handleCheckGrammar} disabled={checkingGrammar || loading}><Sparkles size={16} /> {checkingGrammar ? "Checking Grammar..." : "Check Grammar"}</button>
+        </div>
         <div><button className="cancel-button" type="button" onClick={() => onSave({ cancel: true })}>Cancel</button><button className="save-button" type="submit" disabled={loading}><Save size={16} /> {loading ? "Saving..." : "Save Note"}</button></div>
       </div>
       {showPreview && <div className={`note-preview note-card-${color}`}><h2>{title || "Untitled note"}</h2><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) || "Your note preview will appear here." }} /></div>}
