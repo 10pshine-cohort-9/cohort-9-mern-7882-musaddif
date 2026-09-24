@@ -40,11 +40,21 @@ export const checkGrammar = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Grammar correction error:", error);
+    console.error('Grammar correction error:', error);
 
-    return res.status(500).json({
+    // Backpressure from the worker queue: respond quickly instead of piling
+    // more requests onto a saturated inference worker.
+    if (error.code === 'QUEUE_FULL' || error.code === 'TIMEOUT') {
+      return res.status(429).json({
+        success: false,
+        message: 'Grammar service is busy. Please try again later.',
+      });
+    }
+
+    // Worker/model unavailable: service degradation, not an app bug.
+    return res.status(503).json({
       success: false,
-      message: "Failed to check grammar.",
+      message: 'Grammar service is temporarily unavailable. Please try again later.',
     });
   }
 };

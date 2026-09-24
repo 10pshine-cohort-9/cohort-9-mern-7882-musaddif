@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { validateNoteTitle, validateNoteContent, validateNoteCategory } from '../utils/validation.js';
+import { sanitizeNoteHtml, sanitizePlainText } from '../utils/sanitize.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -27,9 +28,10 @@ export const createNote = async (req, res, next) => {
       return res.status(400).json({ success: false, message: categoryErr });
     }
 
-    // Data normalization
-    const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
+    // Data normalization (sanitize BEFORE storing so XSS payloads never reach
+    // the database)
+    const trimmedTitle = sanitizePlainText(title).trim();
+    const trimmedContent = sanitizeNoteHtml(content).trim();
     const trimmedCategory = category.trim();
     const trimmedTags = tags.trim();
 
@@ -65,26 +67,135 @@ export const createNote = async (req, res, next) => {
   }
 };
 
+const PAGE_LIMIT_DEFAULT = 30;
+const PAGE_LIMIT_MAX = 100;
+const CONTENT_PREVIEW_LENGTH = 300;
+
+const toPositiveInt = (value, fallback) => {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+// Opaque keyset cursor: base64url of "<updated_at_iso>|<id>". Keyset pagination
+// on (updated_at, id) keeps pagination stable as new notes are created and
+// avoids the offset-scan cost of OFFSET/LIMIT on large lists.
+const encodeCursor = (row) =>
+  Buffer.from(`${row.updated_at_key}|${row.id}`, 'utf8').toString('base64url');
+
+const decodeCursor = (raw) => {
+  try {
+    const decoded = Buffer.from(raw, 'base64url').toString('utf8');
+    const separatorIndex = decoded.lastIndexOf('|');
+    if (separatorIndex <= 0) return null;
+    const updatedAt = decoded.slice(0, separatorIndex);
+    const idText = decoded.slice(separatorIndex + 1);
+    if (!updatedAt || !/^\d+$/.test(idText)) return null;
+    return { updatedAt, id: parseInt(idText, 10) };
+  } catch {
+    return null;
+  }
+};
+
+const getNoteCounts = async (userId) => {
+  const [summary, byCategory] = await Promise.all([
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE is_trashed = FALSE) AS active,
+         COUNT(*) FILTER (WHERE is_trashed = TRUE) AS trashed,
+         COUNT(*) AS total
+       FROM notes
+       WHERE user_id = $1`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT category, COUNT(*) AS count
+       FROM notes
+       WHERE user_id = $1 AND is_trashed = FALSE
+       GROUP BY category`,
+      [userId]
+    ),
+  ]);
+
+  const s = summary.rows[0];
+  const byCategoryMap = {};
+  for (const row of byCategory.rows) {
+    byCategoryMap[row.category] = Number(row.count);
+  }
+
+  return {
+    total: Number(s.total),
+    active: Number(s.active),
+    trashed: Number(s.trashed),
+    byCategory: byCategoryMap,
+  };
+};
+
 /**
- * Get all notes for authenticated user
- * GET /api/notes
+ * Get notes for the authenticated user (paginated).
+ * GET /api/notes?scope=active|trash|all&category=&q=&cursor=&limit=
+ *
+ * The list payload omits note.content (full content is served by GET
+ * /api/notes/:id); a short plain-text contentPreview is included instead so
+ * list UIs can render cards without multi-MB bodies.
  */
 export const getNotes = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const limit = Math.min(toPositiveInt(req.query.limit, PAGE_LIMIT_DEFAULT), PAGE_LIMIT_MAX);
+    const scope = ['active', 'trash', 'all'].includes(req.query.scope) ? req.query.scope : 'active';
 
+    const conditions = ['user_id = $1'];
+    const values = [userId];
+    let param = 2;
+
+    if (scope === 'active') {
+      conditions.push('is_trashed = FALSE');
+    } else if (scope === 'trash') {
+      conditions.push('is_trashed = TRUE');
+    }
+
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+    if (category && category !== 'All Notes') {
+      conditions.push(`category = $${param}`);
+      values.push(category);
+      param += 1;
+    }
+
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (q) {
+      conditions.push(`(title ILIKE $${param} OR content ILIKE $${param})`);
+      values.push(`%${q}%`);
+      param += 1;
+    }
+
+    const cursor = typeof req.query.cursor === 'string' ? decodeCursor(req.query.cursor) : null;
+    if (cursor) {
+      conditions.push(
+        `(updated_at < $${param}::timestamp OR (updated_at = $${param}::timestamp AND id < $${param + 1}))`
+      );
+      values.push(cursor.updatedAt, cursor.id);
+      param += 2;
+    }
+
+    // Fetch limit+1 rows to know whether another page exists.
     const result = await pool.query(
-      `SELECT id, title, content, category, tags, theme, is_trashed, created_at, updated_at
+      `SELECT id, title, content, category, tags, theme, is_trashed, created_at, updated_at,
+              to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.US') AS updated_at_key
        FROM notes
-       WHERE user_id = $1
-       ORDER BY updated_at DESC`,
-      [userId]
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY updated_at DESC, id DESC
+       LIMIT ${limit + 1}`,
+      values
     );
 
-    const notes = result.rows.map((note) => ({
+    const rows = result.rows.slice(0, limit);
+    const hasMore = result.rows.length > limit;
+    const nextCursor = hasMore ? encodeCursor(rows[rows.length - 1]) : null;
+
+    const notes = rows.map((note) => ({
       id: note.id,
       title: note.title,
-      content: note.content,
+      contentPreview: sanitizePlainText(note.content).slice(0, CONTENT_PREVIEW_LENGTH),
       category: note.category,
       tags: note.tags,
       theme: note.theme,
@@ -93,9 +204,13 @@ export const getNotes = async (req, res, next) => {
       updatedAt: note.updated_at,
     }));
 
+    const counts = await getNoteCounts(userId);
+
     return res.status(200).json({
       success: true,
       notes,
+      pagination: { limit, nextCursor, hasMore },
+      counts,
       total: notes.length,
     });
   } catch (error) {
@@ -214,8 +329,8 @@ export const updateNote = async (req, res, next) => {
     let paramCounter = 3;
 
     const fieldSetters = [
-      ['title', title, (value) => value.trim()],
-      ['content', content, (value) => value.trim()],
+      ['title', title, (value) => sanitizePlainText(value).trim()],
+      ['content', content, (value) => sanitizeNoteHtml(value).trim()],
       ['category', category, (value) => value.trim()],
       ['tags', tags, (value) => value.trim()],
       ['theme', theme, (value) => value],

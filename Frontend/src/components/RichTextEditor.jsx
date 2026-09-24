@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import Quill from "quill";
+import DOMPurify from "dompurify";
 import "quill/dist/quill.snow.css";
 
 const TOOLBAR_OPTIONS = [
@@ -46,9 +47,10 @@ function RichTextEditor({ value = "", onChange, placeholder = "Write your note h
       }
     });
 
-    // Set the initial content (if any) once the editor is ready.
+    // Set the initial content (if any) once the editor is ready. Sanitize
+    // with DOMPurify so pasted/loaded HTML cannot inject executable markup.
     if (initialValueRef.current) {
-      quill.clipboard.dangerouslyPasteHTML(initialValueRef.current);
+      quill.clipboard.dangerouslyPasteHTML(DOMPurify.sanitize(initialValueRef.current));
     }
 
     return () => {
@@ -70,7 +72,7 @@ function RichTextEditor({ value = "", onChange, placeholder = "Write your note h
     const current = quill.root.innerHTML;
     if (value !== current) {
       const selection = quill.getSelection();
-      quill.clipboard.dangerouslyPasteHTML(value || "");
+      quill.clipboard.dangerouslyPasteHTML(DOMPurify.sanitize(value || ""));
       if (selection && quill.hasFocus()) {
         quill.setSelection(selection, "silent");
       }

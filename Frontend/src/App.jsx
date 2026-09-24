@@ -11,8 +11,7 @@ import NoteDetails from "./pages/NoteDetails";
 import { ProtectedRoute, PublicRoute } from "./components/ProtectedRoute";
 
 function App() {
-  const { token } = useSelector((state) => state.auth);
-  const isAuthenticated = Boolean(token);
+  const { isAuthenticated } = useSelector((state) => state.auth);
 
   return (
     <Routes>

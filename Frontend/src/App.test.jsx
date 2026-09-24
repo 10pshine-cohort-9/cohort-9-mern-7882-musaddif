@@ -6,9 +6,9 @@ import { BrowserRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import App from './App';
 
-const mockAuthReducer = (state = { token: null, user: null }) => state;
+const mockAuthReducer = (state = { isAuthenticated: false, user: null }) => state;
 
-const createTestStore = (authState = { token: null, user: null }) => {
+const createTestStore = (authState = { isAuthenticated: false, user: null }) => {
   return configureStore({
     reducer: {
       auth: mockAuthReducer,
@@ -54,7 +54,7 @@ vi.mock('./pages/NoteDetails', () => ({
   default: () => <div data-testid="note-details-page">Note Details Page</div>,
 }));
 
-const renderAppWithAuth = (authState = { token: null, user: null }) => {
+const renderAppWithAuth = (authState = { isAuthenticated: false, user: null }) => {
   // Reset the shared jsdom history so each test starts at the root path.
   window.history.replaceState({}, '', '/');
   const store = createTestStore(authState);
@@ -69,38 +69,38 @@ const renderAppWithAuth = (authState = { token: null, user: null }) => {
 
 describe('App Routing Tests', () => {
   it('renders login page when not authenticated at the root path', () => {
-    renderAppWithAuth({ token: null, user: null });
+    renderAppWithAuth({ isAuthenticated: false, user: null });
     expect(screen.getByTestId('public-route')).toBeInTheDocument();
     expect(screen.getByTestId('login-page')).toBeInTheDocument();
   });
 
   it('renders notes page when authenticated at the root path', () => {
-    renderAppWithAuth({ token: 'fake-token', user: { id: 1, name: 'Test User' } });
+    renderAppWithAuth({ isAuthenticated: true, user: { id: 1, name: 'Test User' } });
     expect(screen.getByTestId('protected-route')).toBeInTheDocument();
     expect(screen.getByTestId('notes-page')).toBeInTheDocument();
   });
 
   it('does not show the notes page when unauthenticated', () => {
-    renderAppWithAuth({ token: null, user: null });
+    renderAppWithAuth({ isAuthenticated: false, user: null });
     expect(screen.queryByTestId('notes-page')).not.toBeInTheDocument();
     expect(screen.getByTestId('login-page')).toBeInTheDocument();
   });
 
-  it('shows the protected notes page only when a token exists', () => {
-    renderAppWithAuth({ token: 'fake-token', user: { id: 1 } });
+  it('shows the protected notes page only when authenticated', () => {
+    renderAppWithAuth({ isAuthenticated: true, user: { id: 1 } });
     expect(screen.getByTestId('notes-page')).toBeInTheDocument();
   });
 
   it('navigates unknown routes to login when unauthenticated', () => {
     window.history.replaceState({}, '', '/some-unknown-route');
-    renderAppWithAuth({ token: null, user: null });
+    renderAppWithAuth({ isAuthenticated: false, user: null });
     expect(screen.getByTestId('login-page')).toBeInTheDocument();
   });
 });
 
 describe('App Routing - Protected and public pages', () => {
   it('renders signup page for unauthenticated users', () => {
-    renderAppWithAuth({ token: null, user: null });
+    renderAppWithAuth({ isAuthenticated: false, user: null });
     expect(screen.getByTestId('login-page')).toBeInTheDocument();
   });
 });

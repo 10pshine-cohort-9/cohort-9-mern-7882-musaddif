@@ -6,12 +6,12 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import { ProtectedRoute, PublicRoute } from './ProtectedRoute';
 
-const mockAuthReducer = (state = { token: null }) => state;
+const mockAuthReducer = (state = { isAuthenticated: false }) => state;
 
-const renderWithAuth = (token, routeElement) => {
+const renderWithAuth = (isAuthenticated, routeElement) => {
   const store = configureStore({
     reducer: { auth: mockAuthReducer },
-    preloadedState: { auth: { token } },
+    preloadedState: { auth: { isAuthenticated } },
   });
   return render(
     <Provider store={store}>
@@ -27,28 +27,28 @@ const renderWithAuth = (token, routeElement) => {
 };
 
 describe('ProtectedRoute', () => {
-  it('redirects to /login when there is no token', () => {
-    renderWithAuth(null, <ProtectedRoute><div data-testid="secret">Secret</div></ProtectedRoute>);
+  it('redirects to /login when not authenticated', () => {
+    renderWithAuth(false, <ProtectedRoute><div data-testid="secret">Secret</div></ProtectedRoute>);
     expect(screen.queryByTestId('secret')).not.toBeInTheDocument();
     const loginPage = screen.queryByTestId('login-page');
     // May be rendered or mid-navigation; the secret page must never render.
     expect(loginPage).toBeTruthy();
   });
 
-  it('renders children when a token exists', () => {
-    renderWithAuth('valid-token', <ProtectedRoute><div data-testid="secret">Secret</div></ProtectedRoute>);
+  it('renders children when authenticated', () => {
+    renderWithAuth(true, <ProtectedRoute><div data-testid="secret">Secret</div></ProtectedRoute>);
     expect(screen.getByTestId('secret')).toBeInTheDocument();
   });
 });
 
 describe('PublicRoute', () => {
   it('renders children when not authenticated', () => {
-    renderWithAuth(null, <PublicRoute><div data-testid="public">Login</div></PublicRoute>);
+    renderWithAuth(false, <PublicRoute><div data-testid="public">Login</div></PublicRoute>);
     expect(screen.getByTestId('public')).toBeInTheDocument();
   });
 
   it('redirects authenticated users away from public pages', () => {
-    renderWithAuth('valid-token', <PublicRoute><div data-testid="public">Login</div></PublicRoute>);
+    renderWithAuth(true, <PublicRoute><div data-testid="public">Login</div></PublicRoute>);
     expect(screen.queryByTestId('public')).not.toBeInTheDocument();
     expect(screen.getByTestId('notes-page')).toBeInTheDocument();
   });

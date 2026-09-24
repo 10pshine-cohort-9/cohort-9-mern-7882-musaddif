@@ -1,9 +1,11 @@
 import { useRouter } from "expo-router";
 import { Menu, NotebookPen, Search } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -18,52 +20,115 @@ import { StateMessage } from "@/components/ui/StateMessage";
 import { palette } from "@/constants/colors";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { deleteNote, getNotes, restoreNote, trashNote } from "@/store/thunk/noteThunk";
-import type { Note } from "@/store/types";
-import { stripHtml } from "@/utils/text";
+import type { GetNotesParams, Note } from "@/store/types";
 
 type GridItem = Note | null;
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function NotesScreen() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const { notes, loading, error } = useAppSelector((state) => state.notes);
+  const { notes, loading, loadingMore, error, pagination } = useAppSelector((state) => state.notes);
   const { width } = useWindowDimensions();
 
   const [activeCategory, setActiveCategory] = useState("All Notes");
   const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastQueryRef = useRef("");
 
+  const buildParams = useCallback(
+    (extra: GetNotesParams = {}): GetNotesParams => ({
+      scope: activeCategory === "Trash" ? "trash" : "active",
+      category:
+        activeCategory !== "All Notes" && activeCategory !== "Trash" ? activeCategory : undefined,
+      q: searchQuery.trim() || undefined,
+      ...extra,
+    }),
+    [activeCategory, searchQuery]
+  );
+
+  const loadNotes = useCallback(
+    (extra: GetNotesParams = {}) => {
+      dispatch(getNotes(buildParams(extra)));
+    },
+    [dispatch, buildParams]
+  );
+
+  const clearDebounce = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
+
+  // Reload whenever the sidebar category changes (also covers mount). Any
+  // in-flight debounced search for the previous context is cancelled.
   useEffect(() => {
-    dispatch(getNotes());
-  }, [dispatch]);
+    lastQueryRef.current = searchQuery.trim();
+    clearDebounce();
+    loadNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategory]);
 
-  const filteredNotes = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+  // Debounced server-side search. An empty query reloads immediately; typed
+  // queries wait SEARCH_DEBOUNCE_MS so each keystroke does not hit the API.
+  useEffect(() => {
+    clearDebounce();
+    const trimmed = searchQuery.trim();
+    if (trimmed === lastQueryRef.current) {
+      return clearDebounce;
+    }
+    lastQueryRef.current = trimmed;
+    if (trimmed) {
+      debounceRef.current = setTimeout(() => {
+        debounceRef.current = null;
+        loadNotes();
+      }, SEARCH_DEBOUNCE_MS);
+    } else {
+      loadNotes();
+    }
+    return clearDebounce;
+  }, [searchQuery, loadNotes, clearDebounce]);
 
-    return notes.filter((note) => {
-      const matchesLocation = activeCategory === "Trash" ? note.isTrashed : !note.isTrashed;
-      const matchesCategory =
-        activeCategory === "All Notes" ||
-        activeCategory === "Trash" ||
-        note.category === activeCategory;
-      const haystack = `${note.title} ${stripHtml(note.content)} ${note.category}`.toLowerCase();
+  useEffect(() => clearDebounce, [clearDebounce]);
 
-      return matchesLocation && matchesCategory && (!query || haystack.includes(query));
-    });
-  }, [activeCategory, notes, searchQuery]);
+  const handleSelectCategory = (category: string) => {
+    clearDebounce();
+    setActiveCategory(category);
+  };
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    clearDebounce();
+    setRefreshing(true);
+    try {
+      await dispatch(getNotes(buildParams())).unwrap();
+    } catch {
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, clearDebounce, dispatch, buildParams]);
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !pagination.hasMore || !pagination.nextCursor) return;
+    loadNotes({ cursor: pagination.nextCursor });
+  }, [loadingMore, pagination.hasMore, pagination.nextCursor, loadNotes]);
 
   const numColumns = width < 520 ? 1 : width < 820 ? 2 : width < 1120 ? 3 : 4;
 
   const gridData = useMemo<GridItem[]>(() => {
-    if (numColumns === 1) return filteredNotes;
-    const remainder = filteredNotes.length % numColumns;
-    if (remainder === 0) return filteredNotes;
-    return [...filteredNotes, ...(Array(numColumns - remainder).fill(null) as null[])];
-  }, [filteredNotes, numColumns]);
+    if (numColumns === 1) return notes;
+    const remainder = notes.length % numColumns;
+    if (remainder === 0) return notes;
+    return [...notes, ...(Array(numColumns - remainder).fill(null) as null[])];
+  }, [notes, numColumns]);
 
   const isTrashView = activeCategory === "Trash";
 
   return (
-    <NotesScaffold activeCategory={activeCategory} onSelectCategory={setActiveCategory}>
+    <NotesScaffold activeCategory={activeCategory} onSelectCategory={handleSelectCategory}>
       {({ openSidebar }) => (
         <SafeAreaView style={styles.safe} edges={["top"]}>
           <FlatList
@@ -74,6 +139,25 @@ export default function NotesScreen() {
             columnWrapperStyle={numColumns > 1 ? styles.column : undefined}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
+            onEndReachedThreshold={0.4}
+            onEndReached={loadMore}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[palette.purple]}
+                tintColor={palette.purple}
+              />
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <ActivityIndicator
+                  style={styles.footerSpinner}
+                  color={palette.purple}
+                  accessibilityLabel="Loading more notes"
+                />
+              ) : null
+            }
             ListHeaderComponent={
               <View style={styles.header}>
                 <View style={styles.topline}>
@@ -101,11 +185,11 @@ export default function NotesScreen() {
                 <View style={styles.pageHeading}>
                   <Text style={styles.pageTitle}>{activeCategory}</Text>
                   <Text style={styles.pageCount}>
-                    {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
+                    {notes.length} {notes.length === 1 ? "note" : "notes"}
                   </Text>
                 </View>
 
-                {loading ? <StateMessage loading message="Loading notes..." /> : null}
+                {loading && !refreshing ? <StateMessage loading message="Loading notes..." /> : null}
                 {error ? <StateMessage message={`Error: ${error}`} tone="error" /> : null}
               </View>
             }
@@ -215,6 +299,9 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 13,
     color: palette.muted,
+  },
+  footerSpinner: {
+    paddingVertical: 20,
   },
   pressed: {
     opacity: 0.8,

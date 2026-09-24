@@ -19,14 +19,14 @@ export const initSchema = async () => {
  * Remove all rows from every table so each test starts clean.
  */
 export const resetDb = async () => {
-  await pool.query('TRUNCATE TABLE password_reset_tokens, notes, users RESTART IDENTITY CASCADE');
+  await pool.query('TRUNCATE TABLE refresh_tokens, password_reset_tokens, notes, users RESTART IDENTITY CASCADE');
 };
 
 /**
  * Insert a user directly and return the stored row.
  */
 export const createUser = async ({ name, email, password }) => {
-  const bcrypt = (await import('bcryptjs')).default;
+  const bcrypt = (await import('bcrypt')).default;
   const passwordHash = await bcrypt.hash(password, 10);
   const result = await pool.query(
     'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email',
@@ -36,9 +36,14 @@ export const createUser = async ({ name, email, password }) => {
 };
 
 /**
- * Build an Authorization header for a given user id.
+ * Build an Authorization header for a given user id, using the user's current
+ * token_version so the middleware validation passes.
  */
-export const authHeader = (userId) => `Bearer ${generateToken(userId)}`;
+export const authHeader = async (userId) => {
+  const result = await pool.query('SELECT token_version FROM users WHERE id = $1', [userId]);
+  const tokenVersion = result.rows.length > 0 ? result.rows[0].token_version : 0;
+  return `Bearer ${generateToken(userId, tokenVersion)}`;
+};
 
 /**
  * Insert a note directly and return the created note.

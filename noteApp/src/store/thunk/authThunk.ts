@@ -74,9 +74,12 @@ export const getUserProfile = createAsyncThunk<
 
 export const logoutUser = createAsyncThunk<MessageResponse, void, { rejectValue: string }>(
   "auth/logoutUser",
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const response = await api.post<MessageResponse>("/auth/logout");
+      const refreshToken = (
+        getState() as { auth: { refreshToken?: string | null } }
+      ).auth.refreshToken;
+      const response = await api.post<MessageResponse>("/auth/logout", { refreshToken });
       return response.data;
     } catch (error) {
       return rejectWithValue(getErrorMessage(error, "Logout failed"));

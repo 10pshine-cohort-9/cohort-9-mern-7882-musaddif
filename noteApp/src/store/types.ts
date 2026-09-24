@@ -10,6 +10,8 @@ export interface Note {
   id: number;
   title: string;
   content: string;
+  /** Plain-text excerpt returned by GET /notes (full content omitted in list responses). */
+  contentPreview?: string;
   category: string;
   tags: string;
   theme: string;
@@ -18,18 +20,50 @@ export interface Note {
   updatedAt: string;
 }
 
+export interface NotesPagination {
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface NotesCounts {
+  total: number;
+  active: number;
+  trashed: number;
+  byCategory: Record<string, number>;
+}
+
+export interface GetNotesParams {
+  scope?: "active" | "trash" | "all";
+  category?: string;
+  q?: string;
+  limit?: number;
+  cursor?: string | null;
+}
+
 export interface AuthResponse {
   success: boolean;
   message?: string;
   user: User;
   token: string;
+  refreshToken?: string;
+}
+
+export interface RefreshResponse {
+  success: boolean;
+  message?: string;
+  user: User;
+  token: string;
+  refreshToken: string;
 }
 
 export interface NotesResponse {
   success: boolean;
   message?: string;
   notes: Note[];
-  total: number;
+  total?: number;
+  pagination?: NotesPagination;
+  counts?: NotesCounts;
 }
 
 export interface NoteResponse {

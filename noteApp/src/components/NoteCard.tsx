@@ -34,7 +34,8 @@ export function NoteCard({
 
   const theme = getNoteTheme(note.theme);
   const { Icon } = getCategory(note.category);
-  const preview = stripHtml(note.content).slice(0, 200);
+  const preview =
+    note.contentPreview ?? stripHtml(note.content).slice(0, 200);
 
   const handleEdit = () => {
     setMenuOpen(false);

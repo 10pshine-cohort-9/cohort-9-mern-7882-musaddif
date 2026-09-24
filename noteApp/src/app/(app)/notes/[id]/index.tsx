@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, CalendarDays, Clock3, Edit3, Tag } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton } from "@/components/ui/AppButton";
@@ -20,6 +20,7 @@ export default function NoteDetailsScreen() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const { currentNote, loading, error } = useAppSelector((state) => state.notes);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -30,6 +31,17 @@ export default function NoteDetailsScreen() {
     };
   }, [id, dispatch]);
 
+  const handleRefresh = async () => {
+    if (!id || refreshing) return;
+    setRefreshing(true);
+    try {
+      await dispatch(getNoteById(id)).unwrap();
+    } catch {
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading && !currentNote) {
     return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -38,7 +50,7 @@ export default function NoteDetailsScreen() {
     );
   }
 
-  if (error || !currentNote) {
+  if (!currentNote) {
     return (
       <SafeAreaView style={[styles.safe, styles.centered]} edges={["top"]}>
         <StateMessage
@@ -73,7 +85,20 @@ export default function NoteDetailsScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[palette.purple]}
+            tintColor={palette.purple}
+          />
+        }>
         <View style={[styles.paper, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={[styles.iconBox, { backgroundColor: theme.iconBg }]}>
             <Icon size={26} color={theme.iconColor} strokeWidth={2.2} />
@@ -145,6 +170,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: palette.ink,
+  },
+  inlineError: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    fontSize: 13,
+    color: palette.danger,
   },
   edit: {
     flexDirection: "row",

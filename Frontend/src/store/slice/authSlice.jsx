@@ -2,13 +2,13 @@ import { createSlice } from '@reduxjs/toolkit';
 import { loginUser, registerUser, forgotPassword, resetPassword, getUserProfile, logoutUser } from '../thunk/authThunk';
 
 const clearPersistedAuth = () => {
-    const keys = ['persist:auth', 'auth', 'token', 'user', 'isAuthenticated'];
+    const keys = ['persist:notes-auth', 'persist:auth', 'auth', 'token', 'user', 'isAuthenticated'];
     keys.forEach((key) => localStorage.removeItem(key));
 };
 
 const initialState = {
     user: null,
-    token: null,
+    isAuthenticated: false,
     loading: false,
     error: null,
     successMessage: null,
@@ -24,7 +24,7 @@ const authSlice = createSlice({
         },
         logout: (state) => {
             state.user = null;
-            state.token = null;
+            state.isAuthenticated = false;
             state.loading = false;
             state.error = null;
             state.successMessage = null;
@@ -41,21 +41,21 @@ const authSlice = createSlice({
             .addCase(loginUser.fulfilled, (state, action) => {
                 state.loading = false;
                 state.user = action.payload.user;
-                state.token = action.payload.token;
+                state.isAuthenticated = true;
             })
             .addCase(loginUser.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })
-            // Register
+            // Register (no session created — user signs in afterwards)
             .addCase(registerUser.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(registerUser.fulfilled, (state, action) => {
+            .addCase(registerUser.fulfilled, (state) => {
                 state.loading = false;
-                state.user = action.payload.user;
-                state.token = action.payload.token;
+                state.user = null;
+                state.isAuthenticated = false;
             })
             .addCase(registerUser.rejected, (state, action) => {
                 state.loading = false;
@@ -96,6 +96,7 @@ const authSlice = createSlice({
             .addCase(getUserProfile.fulfilled, (state, action) => {
                 state.loading = false;
                 state.user = action.payload.user;
+                state.isAuthenticated = true;
             })
             .addCase(getUserProfile.rejected, (state, action) => {
                 state.loading = false;
@@ -104,14 +105,14 @@ const authSlice = createSlice({
             // Logout User
             .addCase(logoutUser.fulfilled, (state) => {
                 state.user = null;
-                state.token = null;
+                state.isAuthenticated = false;
                 state.error = null;
                 state.successMessage = null;
                 clearPersistedAuth();
             })
             .addCase(logoutUser.rejected, (state) => {
                 state.user = null;
-                state.token = null;
+                state.isAuthenticated = false;
                 state.error = null;
                 state.successMessage = null;
                 clearPersistedAuth();

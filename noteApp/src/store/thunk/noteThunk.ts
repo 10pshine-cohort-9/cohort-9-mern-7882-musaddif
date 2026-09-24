@@ -2,7 +2,7 @@ import { createAsyncThunk } from "@reduxjs/toolkit";
 
 import api from "../api/client";
 import { getErrorMessage } from "../api/error";
-import type { MessageResponse, NoteResponse, NotesResponse } from "../types";
+import type { GetNotesParams, MessageResponse, NoteResponse, NotesResponse } from "../types";
 
 export interface NotePayload {
   title: string;
@@ -25,17 +25,18 @@ export const createNote = createAsyncThunk<
   }
 });
 
-export const getNotes = createAsyncThunk<NotesResponse, void, { rejectValue: string }>(
-  "notes/getNotes",
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await api.get<NotesResponse>("/notes");
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(getErrorMessage(error, "Failed to fetch notes"));
-    }
+export const getNotes = createAsyncThunk<
+  NotesResponse,
+  GetNotesParams | void,
+  { rejectValue: string }
+>("notes/getNotes", async (params, { rejectWithValue }) => {
+  try {
+    const response = await api.get<NotesResponse>("/notes", { params });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(getErrorMessage(error, "Failed to fetch notes"));
   }
-);
+});
 
 export const getNoteById = createAsyncThunk<
   NoteResponse,

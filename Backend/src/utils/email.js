@@ -15,17 +15,15 @@ const transporter = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
   secure: false, // use STARTTLS
+  requireTLS: true, // refuse to downgrade to plaintext if the server lacks STARTTLS
   auth: {
     user: smtpUser,
     pass: smtpPass,
   },
-  tls: {
-    rejectUnauthorized: false,
-  },
 });
 
 if (process.env.NODE_ENV === 'development') {
-  logger.info(`SMTP configured host=${smtpHost} port=${smtpPort} user=${smtpUser ? smtpUser : '<none>'}`);
+  logger.info(`SMTP configured host=${smtpHost} port=${smtpPort}`);
 }
 
 // Verify transporter connection early and log safe info with non-secret details

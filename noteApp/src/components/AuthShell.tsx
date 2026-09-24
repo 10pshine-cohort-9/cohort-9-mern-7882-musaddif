@@ -21,25 +21,49 @@ interface AuthShellProps {
   footer?: ReactNode;
 }
 
-export function AuthShell({ icon, title, subtitle, children, footer }: AuthShellProps) {
+export function AuthShell({
+  icon,
+  title,
+  subtitle,
+  children,
+  footer,
+}: AuthShellProps) {
   return (
     <LinearGradient
       colors={["#f3efff", "#faf9ff", "#ffffff"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.flex}>
+      style={styles.flex}
+    >
       <SafeAreaView style={styles.flex} edges={["top", "bottom"]}>
+        {/* iOS: KeyboardAvoidingView with behavior="padding" shrinks the
+            available height by the keyboard height. keyboardVerticalOffset=64
+            accounts for the safe-area top inset so the calculation is correct
+            and the focused field is never hidden behind the keyboard.
+            The ScrollView's paddingBottom provides an extra comfortable gap
+            (~60px) above the keyboard for the last field.
+            Android: no behavior — softwareKeyboardLayoutMode:"resize" in
+            app.json already resizes the window, and the paddingBottom keeps
+            the last field clear. */}
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+        >
           <ScrollView
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.content}>
               <View style={styles.brand}>
                 <View style={styles.brandMark}>
-                  <NotebookPen size={21} color={palette.white} strokeWidth={1.8} />
+                  <NotebookPen
+                    size={21}
+                    color={palette.white}
+                    strokeWidth={1.8}
+                  />
                 </View>
                 <Text style={styles.brandText}>notes</Text>
               </View>
@@ -47,7 +71,9 @@ export function AuthShell({ icon, title, subtitle, children, footer }: AuthShell
               <View style={styles.card}>
                 {icon ? <View style={styles.cardIcon}>{icon}</View> : null}
                 {title ? <Text style={styles.title}>{title}</Text> : null}
-                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                {subtitle ? (
+                  <Text style={styles.subtitle}>{subtitle}</Text>
+                ) : null}
                 <View style={styles.body}>{children}</View>
               </View>
 
@@ -66,14 +92,23 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-    justifyContent: "center",
     paddingHorizontal: 20,
-    paddingVertical: 32,
+    paddingTop: 32,
+    // Extra bottom space ensures the last input sits comfortably (~60px)
+    // above the keyboard edge on all screen sizes. On iOS this is in
+    // addition to the space KeyboardAvoidingView already opens; on Android
+    // it prevents the last field from touching the keyboard top.
+    paddingBottom: 60,
   },
   content: {
     width: "100%",
     maxWidth: 440,
     alignSelf: "center",
+    // "auto" margins keep the card vertically centred when it fits, but
+    // collapse to 0 when the keyboard shrinks the viewport — unlike
+    // justifyContent: "center", the top of an overflowing form stays
+    // reachable while scrolling.
+    marginVertical: "auto",
   },
   brand: {
     flexDirection: "row",

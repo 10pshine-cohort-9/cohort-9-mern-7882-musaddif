@@ -1,5 +1,5 @@
 import {
-  ChevronDown,
+  // ChevronDown,
   House,
   LogOut,
   NotebookPen,
@@ -8,22 +8,32 @@ import {
   UserRound,
   X,
 } from "lucide-react-native";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  // Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { categories } from "@/constants/categories";
 import { getNoteTheme, palette } from "@/constants/colors";
-import type { Note, User } from "@/store/types";
+import type { NotesCounts, User } from "@/store/types";
 
 interface NotesSidebarProps {
   visible: boolean;
   onClose: () => void;
   activeCategory: string;
   onSelectCategory: (category: string) => void;
-  notes: Note[];
+  counts: NotesCounts;
   user: User | null;
-  profileImage: string | null;
-  onPickImage: () => void;
+  // TODO(profile-image): profile image upload temporarily disabled. Re-enable by
+  // uncommenting these props (and their usage + NotesScaffold's ImagePicker code).
+  // profileImage: string | null;
+  // onPickImage: () => void;
   onNewNote: () => void;
   onLogout: () => void;
 }
@@ -33,15 +43,15 @@ export function NotesSidebar({
   onClose,
   activeCategory,
   onSelectCategory,
-  notes,
+  counts,
   user,
-  profileImage,
-  onPickImage,
+  // profileImage,
+  // onPickImage,
   onNewNote,
   onLogout,
 }: NotesSidebarProps) {
-  const activeNotes = notes.filter((note) => !note.isTrashed);
-  const trashedNotes = notes.filter((note) => note.isTrashed);
+  const activeCount = counts.active;
+  const trashedCount = counts.trashed;
 
   return (
     <Modal
@@ -78,14 +88,14 @@ export function NotesSidebar({
             <View style={styles.navGroup}>
               <NavItem
                 label="All Notes"
-                count={activeNotes.length}
+                count={activeCount}
                 active={activeCategory === "All Notes"}
                 icon={<House size={18} color={activeCategory === "All Notes" ? palette.purple : "#28314b"} />}
                 onPress={() => onSelectCategory("All Notes")}
               />
               <NavItem
                 label="Trash"
-                count={trashedNotes.length}
+                count={trashedCount}
                 active={activeCategory === "Trash"}
                 icon={<Trash2 size={18} color={activeCategory === "Trash" ? palette.purple : "#28314b"} />}
                 onPress={() => onSelectCategory("Trash")}
@@ -95,7 +105,7 @@ export function NotesSidebar({
             <Text style={styles.sectionLabel}>Categories</Text>
             <View style={styles.navGroup}>
               {categories.map((category) => {
-                const count = activeNotes.filter((note) => note.category === category.name).length;
+                const count = counts.byCategory[category.name] || 0;
                 const active = activeCategory === category.name;
                 return (
                   <NavItem
@@ -112,17 +122,22 @@ export function NotesSidebar({
           </ScrollView>
 
           <View style={styles.profileArea}>
+            {/* Profile image upload temporarily disabled: the Pressable below used
+                to open the image picker via onPickImage. Restore by re-adding
+                onPress={onPickImage} + accessibilityLabel and uncommenting the
+                profileImage prop wiring. */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Change profile image"
-              onPress={onPickImage}
+              // accessibilityLabel="Change profile image"
+              // onPress={onPickImage}
               style={({ pressed }) => [styles.profileButton, pressed && styles.pressed]}>
               <View style={styles.avatar}>
-                {profileImage ? (
+                {/* {profileImage ? (
                   <Image source={{ uri: profileImage }} style={styles.avatarImage} />
                 ) : (
                   <UserRound size={22} color="#61708a" />
-                )}
+                )} */}
+                <UserRound size={22} color="#61708a" />
               </View>
               <View style={styles.profileCopy}>
                 <Text style={styles.profileName} numberOfLines={1}>
@@ -132,7 +147,7 @@ export function NotesSidebar({
                   {user?.email || "user@example.com"}
                 </Text>
               </View>
-              <ChevronDown size={17} color={palette.muted} />
+              {/* <ChevronDown size={17} color={palette.muted} /> */}
             </Pressable>
 
             <Pressable

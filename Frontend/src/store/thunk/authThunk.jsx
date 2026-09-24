@@ -5,10 +5,7 @@ export const loginUser = createAsyncThunk(
     'auth/loginUser',
     async (userData, { rejectWithValue }) => {
         try {
-
             const response = await api.post('/auth/login', userData);
-            console.log("response= ", response);
-
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data?.message || 'Login failed');
@@ -68,9 +65,9 @@ export const logoutUser = createAsyncThunk(
     'auth/logoutUser',
     async (_, { rejectWithValue }) => {
         try {
+            // The refresh token is sent via the httpOnly cookie; the server
+            // revokes it and clears the cookies.
             const response = await api.post('/auth/logout');
-            console.log("response= ", response);
-
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data?.message || 'Logout failed');

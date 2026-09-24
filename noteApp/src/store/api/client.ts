@@ -1,8 +1,15 @@
 import Constants from "expo-constants";
-import { create } from "axios";
+import { create, type AxiosError } from "axios";
 import { Platform } from "react-native";
 
-import { getAuthToken } from "./token";
+import type { RefreshResponse } from "../types";
+import {
+  fireSessionExpired,
+  getAuthToken,
+  getRefreshToken,
+  setAuthToken,
+  setRefreshToken,
+} from "./token";
 
 const API_PORT = 5000;
 
@@ -61,6 +68,61 @@ api.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+const isAuthUrl = (url?: string): boolean =>
+  typeof url === "string" && url.startsWith("/auth/");
+
+let refreshInFlight: Promise<void> | null = null;
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const { response, config } = error;
+    if (
+      !response ||
+      response.status !== 401 ||
+      !config ||
+      (config as { _retry?: boolean })._retry ||
+      isAuthUrl(config.url)
+    ) {
+      return Promise.reject(error);
+    }
+
+    (config as { _retry?: boolean })._retry = true;
+
+    if (refreshInFlight) {
+      try {
+        await refreshInFlight;
+      } catch {
+        // Fall through to retry; if the retry 401s again the refresh below
+        // has already cleared the session.
+      }
+      return api(config);
+    }
+
+    refreshInFlight = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        throw new Error("No refresh token available");
+      }
+      const { data } = await api.post<RefreshResponse>("/auth/refresh", {
+        refreshToken,
+      });
+      setAuthToken(data.token);
+      setRefreshToken(data.refreshToken);
+    })();
+
+    try {
+      await refreshInFlight;
+      return api(config);
+    } catch {
+      fireSessionExpired();
+      return Promise.reject(error);
+    } finally {
+      refreshInFlight = null;
+    }
+  }
 );
 
 export default api;

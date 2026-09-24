@@ -28,12 +28,22 @@ export const validateEmail = (email) => {
   return null;
 };
 
+/**
+ * bcrypt truncates inputs at 72 bytes; rejecting longer passwords prevents both
+ * silent truncation (two different passwords hashing identically) and abuse by
+ * attackers sending multi-megabyte strings.
+ */
+export const MAX_PASSWORD_BYTES = 72;
+
 export const validatePassword = (password) => {
   if (!password || typeof password !== 'string') {
     return 'Password is required.';
   }
   if (password.length < 8) {
     return 'Password must be at least 8 characters long.';
+  }
+  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) {
+    return `Password must not exceed ${MAX_PASSWORD_BYTES} bytes.`;
   }
   const hasUpperCase = /[A-Z]/.test(password);
   const hasLowerCase = /[a-z]/.test(password);
@@ -63,6 +73,8 @@ export const validateNoteTitle = (title) => {
   return null;
 };
 
+export const MAX_NOTE_CONTENT_LENGTH = 50000;
+
 export const validateNoteContent = (content) => {
   if (!content || typeof content !== 'string') {
     return 'Note content is required.';
@@ -70,6 +82,9 @@ export const validateNoteContent = (content) => {
   const trimmed = content.trim();
   if (trimmed.length === 0) {
     return 'Note content cannot be empty.';
+  }
+  if (trimmed.length > MAX_NOTE_CONTENT_LENGTH) {
+    return `Note content must not exceed ${MAX_NOTE_CONTENT_LENGTH} characters.`;
   }
   return null;
 };

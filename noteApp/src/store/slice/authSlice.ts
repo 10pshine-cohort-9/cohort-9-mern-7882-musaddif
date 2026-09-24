@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 import {
   forgotPassword,
@@ -13,6 +13,9 @@ import type { User } from "../types";
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
+  /** True once persisted tokens have been restored on startup. */
+  sessionRestored: boolean;
   loading: boolean;
   error: string | null;
   successMessage: string | null;
@@ -21,6 +24,8 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   token: null,
+  refreshToken: null,
+  sessionRestored: false,
   loading: false,
   error: null,
   successMessage: null,
@@ -37,9 +42,18 @@ const authSlice = createSlice({
     logout: (state) => {
       state.user = null;
       state.token = null;
+      state.refreshToken = null;
       state.loading = false;
       state.error = null;
       state.successMessage = null;
+    },
+    sessionRestored: (
+      state,
+      action: PayloadAction<{ token: string | null; refreshToken: string | null }>
+    ) => {
+      state.token = action.payload.token;
+      state.refreshToken = action.payload.refreshToken;
+      state.sessionRestored = true;
     },
   },
   extraReducers: (builder) => {
@@ -53,6 +67,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken ?? null;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -114,19 +129,21 @@ const authSlice = createSlice({
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
         state.token = null;
+        state.refreshToken = null;
         state.error = null;
         state.successMessage = null;
       })
       .addCase(logoutUser.rejected, (state) => {
         state.user = null;
         state.token = null;
+        state.refreshToken = null;
         state.error = null;
         state.successMessage = null;
       });
   },
 });
 
-export const { clearError, logout } = authSlice.actions;
+export const { clearError, logout, sessionRestored } = authSlice.actions;
 
 export type { AuthState };
 export default authSlice.reducer;

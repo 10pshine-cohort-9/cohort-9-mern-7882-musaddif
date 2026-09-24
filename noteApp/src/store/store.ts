@@ -11,15 +11,26 @@ import {
   persistStore,
 } from "redux-persist";
 
-import { setAuthToken } from "./api/token";
-import authReducer from "./slice/authSlice";
+import {
+  restoreTokensFromSecureStore,
+  setAuthToken,
+  setOnSessionExpired,
+  setRefreshToken,
+} from "./api/token";
+import authReducer, { logout, sessionRestored } from "./slice/authSlice";
 import noteReducer from "./slice/noteSlice";
 
+// Tokens are persisted to the OS keychain (expo-secure-store), never to
+// AsyncStorage. Only the non-sensitive user object is persisted here.
 const persistConfig = {
-  key: "auth",
+  key: "notes-auth-v2",
   storage: AsyncStorage,
-  whitelist: ["token", "user"],
+  whitelist: ["user"],
 };
+
+// Purge any legacy persisted auth (key 'persist:auth') that may still hold
+// raw tokens written before the keychain-based storage was introduced.
+AsyncStorage.removeItem("persist:auth").catch(() => {});
 
 const rootReducer = combineReducers({
   auth: persistReducer(persistConfig, authReducer),
@@ -36,13 +47,28 @@ export const store = configureStore({
     }),
 });
 
-// Keep the in-memory token used by the API client in sync with the store.
+// Keep the in-memory tokens used by the API client in sync with the store;
+// setAuthToken/setRefreshToken also mirror writes to the keychain.
 setAuthToken(store.getState().auth.token);
+setRefreshToken(store.getState().auth.refreshToken);
 store.subscribe(() => {
-  setAuthToken(store.getState().auth.token);
+  const { token, refreshToken } = store.getState().auth;
+  setAuthToken(token);
+  setRefreshToken(refreshToken);
+});
+
+// When a refresh attempt fails, sign the user out so the protected route
+// layout redirects to the login screen.
+setOnSessionExpired(() => {
+  store.dispatch(logout());
 });
 
 export const persistor = persistStore(store);
+
+// Restore the keychain-persisted session so returning users skip login.
+void restoreTokensFromSecureStore().then(({ token, refreshToken }) => {
+  store.dispatch(sessionRestored({ token, refreshToken }));
+});
 
 export type RootState = ReturnType<typeof rootReducer>;
 export type AppDispatch = typeof store.dispatch;

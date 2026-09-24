@@ -1,4 +1,7 @@
-import * as ImagePicker from "expo-image-picker";
+// TODO(profile-image): profile image upload temporarily disabled. Re-enable by
+// uncommenting the import, profileImage state, handlePickImage, and the two
+// props passed to NotesSidebar below.
+// import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
@@ -23,12 +26,14 @@ export function NotesScaffold({
 }: NotesScaffoldProps) {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const notes = useAppSelector((state) => state.notes.notes);
+  const counts = useAppSelector(
+    (state) => state.notes.counts
+  );
   const user = useAppSelector((state) => state.auth.user);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  // const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const handleSelectCategory = (category: string) => {
     setSidebarOpen(false);
@@ -39,22 +44,22 @@ export function NotesScaffold({
     }
   };
 
-  const handlePickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets[0]?.uri) {
-        setProfileImage(result.assets[0].uri);
-      }
-    } catch {
-      // Ignore picker failures.
-    }
-  };
+  // const handlePickImage = async () => {
+  //   try {
+  //     const result = await ImagePicker.launchImageLibraryAsync({
+  //       mediaTypes: ["images"],
+  //       allowsEditing: true,
+  //       aspect: [1, 1],
+  //       quality: 0.7,
+  //     });
+  //
+  //     if (!result.canceled && result.assets[0]?.uri) {
+  //       setProfileImage(result.assets[0].uri);
+  //     }
+  //   } catch {
+  //     // Ignore picker failures.
+  //   }
+  // };
 
   const handleLogout = async () => {
     try {
@@ -76,10 +81,10 @@ export function NotesScaffold({
         onClose={() => setSidebarOpen(false)}
         activeCategory={activeCategory}
         onSelectCategory={handleSelectCategory}
-        notes={notes}
+        counts={counts}
         user={user}
-        profileImage={profileImage}
-        onPickImage={handlePickImage}
+        // profileImage={profileImage}
+        // onPickImage={handlePickImage}
         onNewNote={() => {
           setSidebarOpen(false);
           router.push("/notes/new");

@@ -9,22 +9,28 @@ import {
   trashNote,
   updateNote,
 } from "../thunk/noteThunk";
-import type { Note } from "../types";
+import type { Note, NotesCounts, NotesPagination } from "../types";
 
 interface NoteState {
   notes: Note[];
   currentNote: Note | null;
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
   successMessage: string | null;
+  pagination: NotesPagination;
+  counts: NotesCounts;
 }
 
 const initialState: NoteState = {
   notes: [],
   currentNote: null,
   loading: false,
+  loadingMore: false,
   error: null,
   successMessage: null,
+  pagination: { limit: 30, hasMore: false, nextCursor: null },
+  counts: { total: 0, active: 0, trashed: 0, byCategory: {} },
 };
 
 const noteSlice = createSlice({
@@ -57,17 +63,33 @@ const noteSlice = createSlice({
         state.error = action.payload ?? "Failed to create note";
       })
 
-      // Get Notes
-      .addCase(getNotes.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+      // Get Notes (server-side pagination: replace list on a fresh fetch,
+      // append when called with a cursor for infinite scroll).
+      .addCase(getNotes.pending, (state, action) => {
+        if (action.meta.arg && (action.meta.arg as { cursor?: string | null }).cursor) {
+          state.loadingMore = true;
+        } else {
+          state.loading = true;
+          state.error = null;
+        }
       })
       .addCase(getNotes.fulfilled, (state, action) => {
+        const append = Boolean(action.meta.arg && (action.meta.arg as { cursor?: string | null }).cursor);
         state.loading = false;
-        state.notes = action.payload.notes || [];
+        state.loadingMore = false;
+        state.notes = append
+          ? [...state.notes, ...(action.payload.notes || [])]
+          : (action.payload.notes || []);
+        if (action.payload.pagination) {
+          state.pagination = action.payload.pagination;
+        }
+        if (action.payload.counts) {
+          state.counts = action.payload.counts;
+        }
       })
       .addCase(getNotes.rejected, (state, action) => {
         state.loading = false;
+        state.loadingMore = false;
         state.error = action.payload ?? "Failed to fetch notes";
       })
 
@@ -105,7 +127,8 @@ const noteSlice = createSlice({
         state.error = action.payload ?? "Failed to update note";
       })
 
-      // Trash Note
+      // Trash Note (list is server-scoped, so a trashed note leaves the active
+      // view; the next fetch reconciles counts).
       .addCase(trashNote.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -113,10 +136,7 @@ const noteSlice = createSlice({
       })
       .addCase(trashNote.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.notes.findIndex((note) => note.id === action.payload.note.id);
-        if (index >= 0) {
-          state.notes[index] = action.payload.note;
-        }
+        state.notes = state.notes.filter((note) => note.id !== action.payload.note.id);
         state.successMessage = action.payload.message || "Note moved to trash";
       })
       .addCase(trashNote.rejected, (state, action) => {
@@ -124,7 +144,7 @@ const noteSlice = createSlice({
         state.error = action.payload ?? "Failed to trash note";
       })
 
-      // Restore Note
+      // Restore Note (a restored note leaves the Trash scope).
       .addCase(restoreNote.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -132,10 +152,7 @@ const noteSlice = createSlice({
       })
       .addCase(restoreNote.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.notes.findIndex((note) => note.id === action.payload.note.id);
-        if (index >= 0) {
-          state.notes[index] = action.payload.note;
-        }
+        state.notes = state.notes.filter((note) => note.id !== action.payload.note.id);
         state.successMessage = action.payload.message || "Note restored successfully";
       })
       .addCase(restoreNote.rejected, (state, action) => {

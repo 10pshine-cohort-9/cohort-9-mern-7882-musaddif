@@ -15,9 +15,11 @@ export const createNote = createAsyncThunk(
 
 export const getNotes = createAsyncThunk(
   'notes/getNotes',
-  async (_, { rejectWithValue }) => {
+  async ({ scope = 'active', category, q, limit, cursor } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get('/notes');
+      const response = await api.get('/notes', {
+        params: { scope, category, q, limit, cursor },
+      });
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch notes');

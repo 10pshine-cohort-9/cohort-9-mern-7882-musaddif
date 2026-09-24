@@ -25,15 +25,17 @@ describe('Auth API', () => {
       expect(res.body.user).to.not.have.property('password_hash');
     });
 
-    it('rejects duplicate email registration', async () => {
+    it('does not reveal account existence on duplicate email registration', async () => {
       await createUser(TEST_USER);
       const res = await request(app)
         .post('/api/auth/register')
         .send({ name: 'Another', email: TEST_USER.email, password: TEST_USER.password });
 
-      expect(res.status).to.equal(400);
-      expect(res.body.success).to.be.false;
-      expect(res.body.message).to.include('already exists');
+      // Same status + success flag + message as a brand-new registration so an
+      // attacker cannot enumerate registered emails.
+      expect(res.status).to.equal(201);
+      expect(res.body.success).to.be.true;
+      expect(res.body.message).to.equal('User registered successfully.');
     });
 
     it('rejects invalid email format', async () => {
@@ -100,7 +102,7 @@ describe('Auth API', () => {
       const user = await createUser(TEST_USER);
       const res = await request(app)
         .get('/api/auth/me')
-        .set('Authorization', authHeader(user.id));
+        .set('Authorization', await authHeader(user.id));
 
       expect(res.status).to.equal(200);
       expect(res.body.user.id).to.equal(user.id);

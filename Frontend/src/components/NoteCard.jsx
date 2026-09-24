@@ -8,7 +8,7 @@ function NoteCard({ note, isTrashView = false, onTrash, onRestore, onDeletePerma
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const navigate = useNavigate();
   const Icon = note.icon;
-  const previewContent = stripHtml(note.content).slice(0, 200);
+  const previewContent = note.contentPreview ?? stripHtml(note.content ?? "").slice(0, 200);
 
   return (
     <article className={`note-card note-card-${note.theme}`}

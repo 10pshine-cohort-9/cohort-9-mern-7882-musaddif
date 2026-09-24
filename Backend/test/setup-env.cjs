@@ -7,13 +7,24 @@ const { Pool } = require('pg');
 const TEST_DB_NAME = process.env.TEST_DB_NAME || 'notes_db_test';
 const adminDb = process.env.DB_NAME || 'notes_db';
 
+const requireConfig = (key) => {
+  if (!process.env[key] || !process.env[key].trim()) {
+    throw new Error(`${key} must be set (tests refuse to use fallback credentials).`);
+  }
+  return process.env[key].trim();
+};
+
 const bootstrap = async () => {
+  const dbUser = requireConfig('DB_USER');
+  const dbPassword = requireConfig('DB_PASSWORD');
+  const dbName = requireConfig('DB_NAME');
+
   const adminPool = new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     database: adminDb,
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
+    user: dbUser,
+    password: dbPassword,
   });
 
   const exists = await adminPool.query('SELECT 1 FROM pg_database WHERE datname = $1', [TEST_DB_NAME]);
