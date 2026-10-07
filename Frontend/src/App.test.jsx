@@ -54,9 +54,13 @@ vi.mock('./pages/NoteDetails', () => ({
   default: () => <div data-testid="note-details-page">Note Details Page</div>,
 }));
 
-const renderAppWithAuth = (authState = { isAuthenticated: false, user: null }) => {
-  // Reset the shared jsdom history so each test starts at the root path.
-  window.history.replaceState({}, '', '/');
+vi.mock('./pages/calminityLanding', () => ({
+  default: () => <div data-testid="calminity-page">Calminity Landing Page</div>,
+}));
+
+const renderAppWithAuth = (authState = { isAuthenticated: false, user: null }, path = '/') => {
+  // Reset the shared jsdom history so each test starts from a known path.
+  window.history.replaceState({}, '', path);
   const store = createTestStore(authState);
   return render(
     <Provider store={store}>
@@ -95,6 +99,12 @@ describe('App Routing Tests', () => {
     window.history.replaceState({}, '', '/some-unknown-route');
     renderAppWithAuth({ isAuthenticated: false, user: null });
     expect(screen.getByTestId('login-page')).toBeInTheDocument();
+  });
+
+  it('renders the public calminity landing page without authentication', () => {
+    renderAppWithAuth({ isAuthenticated: false, user: null }, '/calminity');
+    expect(screen.getByTestId('calminity-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 });
 

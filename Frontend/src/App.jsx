@@ -8,6 +8,7 @@ import ResetPassword from "./auth/resetPassword";
 import NotesPage from "./pages/notes";
 import NewNotePage from "./pages/newNote";
 import NoteDetails from "./pages/NoteDetails";
+import CalminityLanding from "./pages/calminityLanding";
 import { ProtectedRoute, PublicRoute } from "./components/ProtectedRoute";
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
       />
       <Route path="/notes/:id/edit" element={<ProtectedRoute><NewNotePage /></ProtectedRoute>} />
       <Route path="/notes/:id" element={<ProtectedRoute><NoteDetails /></ProtectedRoute>} />
+      <Route path="/calminity" element={<CalminityLanding />} />
       <Route path="*" element={<Navigate to={isAuthenticated ? "/notes" : "/login"} replace />} />
     </Routes>
   );

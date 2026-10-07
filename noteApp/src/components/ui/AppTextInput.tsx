@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode } from "react";
+import { forwardRef, useRef, type ReactNode } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { useKeyboardAwareInput } from "@/components/KeyboardAwareScrollView";
 import { palette } from "@/constants/colors";
 
 interface AppTextInputProps extends TextInputProps {
@@ -35,12 +36,25 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
     inputStyle,
     multiline,
     style,
+    onBlur,
+    onFocus,
     ...rest
   },
   ref
 ) {
   const hasError = Boolean(error);
   const errorMessage = typeof error === "string" ? error : undefined;
+  const focusInput = useKeyboardAwareInput();
+  const inputRef = useRef<TextInput>(null);
+
+  const setInputRef = (node: TextInput | null) => {
+    inputRef.current = node;
+    if (typeof ref === "function") {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  };
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -59,7 +73,7 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
         ]}>
         {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
         <TextInput
-          ref={ref}
+          ref={setInputRef}
           placeholderTextColor={palette.placeholder}
           multiline={multiline}
           style={[
@@ -69,6 +83,14 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
             inputStyle,
             style,
           ]}
+          onFocus={(event) => {
+            focusInput(inputRef.current);
+            onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            focusInput(null);
+            onBlur?.(event);
+          }}
           {...rest}
         />
         {rightElement ? <View style={styles.rightElement}>{rightElement}</View> : null}

@@ -12,17 +12,24 @@ const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Validate that database credentials are configured. Fails fast (rather than
- * silently connecting with default credentials) when required values are
- * missing. Host/port defaults are kept: they are not secrets.
+ * Validate that a PostgreSQL connection URL is configured and well-formed.
  */
 export const assertDbConfig = () => {
-  const required = ['DB_USER', 'DB_PASSWORD', 'DB_NAME'];
-  const missing = required.filter((key) => !process.env[key] || !process.env[key].trim());
+  const databaseUrl = process.env.DATABASE_URL?.trim();
 
-  if (missing.length > 0) {
-    const hint = `Set ${missing.join(', ')} in your .env file — the server refuses to start with fallback credentials.`;
-    throw new Error(`Database credentials are not configured. ${hint}`);
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL must be set in your .env file.');
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(databaseUrl);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
+  }
+
+  if (!['postgres:', 'postgresql:'].includes(parsedUrl.protocol)) {
+    throw new Error('DATABASE_URL must use the postgres:// or postgresql:// protocol.');
   }
 };
 
@@ -32,11 +39,7 @@ const toNumber = (value, fallback) => {
 };
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  connectionString: process.env.DATABASE_URL?.trim(),
   // Pool sizing & timeouts: without a max, the pg default of 10 connections is
   // shared by every request, and slow queries can hold slots indefinitely.
   // These bounds let the pool absorb bursts and fail fast instead of queueing
@@ -57,29 +60,26 @@ pool.on('error', (err) => {
 });
 
 // Utility to verify database connection and initialize tables on startup
-export const testDbConnection = async (dbNameOverride) => {
+export const testDbConnection = async () => {
   let client;
   try {
-    const targetPool = dbNameOverride ? new Pool({ ...pool.options, database: dbNameOverride }) : pool;
-    client = await targetPool.connect();
+    client = await pool.connect();
     const result = await client.query('SELECT NOW()');
     logger.info(`PostgreSQL connected successfully at ${result.rows[0].now}`);
 
-    if (!dbNameOverride) {
-      // Idempotent, cwd-independent schema bootstrap (schema.sql uses
-      // IF NOT EXISTS everywhere, and the path is resolved relative to this
-      // module). Concurrent replicas may both attempt bootstrap — the loser of
-      // the race is harmless, so a schema hiccup is logged, never fatal.
-      const schemaPath = path.join(__dirname, 'schema.sql');
-      try {
-        if (fs.existsSync(schemaPath)) {
-          const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-          await client.query(schemaSql);
-          logger.info('Database tables initialized successfully.');
-        }
-      } catch (schemaError) {
-        logger.warn({ err: schemaError }, 'Schema bootstrap skipped (idempotent, safe to retry)');
+    // Idempotent, cwd-independent schema bootstrap (schema.sql uses
+    // IF NOT EXISTS everywhere, and the path is resolved relative to this
+    // module). Concurrent replicas may both attempt bootstrap — the loser of
+    // the race is harmless, so a schema hiccup is logged, never fatal.
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    try {
+      if (fs.existsSync(schemaPath)) {
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+        await client.query(schemaSql);
+        logger.info('Database tables initialized successfully.');
       }
+    } catch (schemaError) {
+      logger.warn({ err: schemaError }, 'Schema bootstrap skipped (idempotent, safe to retry)');
     }
 
     client.release();

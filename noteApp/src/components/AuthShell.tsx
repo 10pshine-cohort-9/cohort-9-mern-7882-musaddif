@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/colors";
+import { KeyboardAwareScrollView } from "@/components/KeyboardAwareScrollView";
 
 interface AuthShellProps {
   icon?: ReactNode;
@@ -36,50 +36,45 @@ export function AuthShell({
       style={styles.flex}
     >
       <SafeAreaView style={styles.flex} edges={["top", "bottom"]}>
-        {/* iOS: KeyboardAvoidingView with behavior="padding" shrinks the
-            available height by the keyboard height. keyboardVerticalOffset=64
-            accounts for the safe-area top inset so the calculation is correct
-            and the focused field is never hidden behind the keyboard.
-            The ScrollView's paddingBottom provides an extra comfortable gap
-            (~60px) above the keyboard for the last field.
-            Android: no behavior — softwareKeyboardLayoutMode:"resize" in
-            app.json already resizes the window, and the paddingBottom keeps
-            the last field clear. */}
+        {/* iOS: KeyboardAvoidingView with behavior="padding" lifts the whole
+            form by the actual keyboard height. Android: no behavior — the
+            native softwareKeyboardLayoutMode:"resize" in app.json resizes the
+            window instead. The KeyboardAwareScrollView adds an explicit
+            measurement pass so the focused input is always scrolled above the
+            keyboard with a comfortable gap — this also covers Android Expo Go
+            / edge-to-edge, where the window is not resized and a plain
+            ScrollView has nothing to scroll. */}
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+          keyboardVerticalOffset={0}
         >
-          <ScrollView
+          <KeyboardAwareScrollView
             contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
+            contentStyle={styles.content}
           >
-            <View style={styles.content}>
-              <View style={styles.brand}>
-                <View style={styles.brandMark}>
-                  <NotebookPen
-                    size={21}
-                    color={palette.white}
-                    strokeWidth={1.8}
-                  />
-                </View>
-                <Text style={styles.brandText}>notes</Text>
+            <View style={styles.brand}>
+              <View style={styles.brandMark}>
+                <NotebookPen
+                  size={21}
+                  color={palette.white}
+                  strokeWidth={1.8}
+                />
               </View>
-
-              <View style={styles.card}>
-                {icon ? <View style={styles.cardIcon}>{icon}</View> : null}
-                {title ? <Text style={styles.title}>{title}</Text> : null}
-                {subtitle ? (
-                  <Text style={styles.subtitle}>{subtitle}</Text>
-                ) : null}
-                <View style={styles.body}>{children}</View>
-              </View>
-
-              {footer}
+              <Text style={styles.brandText}>notes</Text>
             </View>
-          </ScrollView>
+
+            <View style={styles.card}>
+              {icon ? <View style={styles.cardIcon}>{icon}</View> : null}
+              {title ? <Text style={styles.title}>{title}</Text> : null}
+              {subtitle ? (
+                <Text style={styles.subtitle}>{subtitle}</Text>
+              ) : null}
+              <View style={styles.body}>{children}</View>
+            </View>
+
+            {footer}
+          </KeyboardAwareScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
@@ -94,10 +89,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 32,
-    // Extra bottom space ensures the last input sits comfortably (~60px)
-    // above the keyboard edge on all screen sizes. On iOS this is in
-    // addition to the space KeyboardAvoidingView already opens; on Android
-    // it prevents the last field from touching the keyboard top.
+    // Base bottom space when the keyboard is closed. While it is open the
+    // KeyboardAwareScrollView replaces this with the actual keyboard height
+    // and auto-scrolls the focused field above the keyboard with its own
+    // comfortable 20-40px gap.
     paddingBottom: 60,
   },
   content: {
