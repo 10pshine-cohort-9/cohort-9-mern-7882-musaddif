@@ -4,6 +4,7 @@ build/
 .env
 .env.local
 .env.*.local
+!noteApp/.env
 *.log
 .DS_Store
 .vscode/

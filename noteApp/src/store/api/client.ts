@@ -1,6 +1,4 @@
-import Constants from "expo-constants";
 import { create, type AxiosError } from "axios";
-import { Platform } from "react-native";
 
 import type { RefreshResponse } from "../types";
 import {
@@ -11,43 +9,39 @@ import {
   setRefreshToken,
 } from "./token";
 
-const API_PORT = 5000;
-
 /**
- * Host of the Metro dev server (e.g. `192.168.1.20` when running on LAN).
- * On a physical device the backend runs on the same machine as Metro, so we
- * reuse that host instead of `localhost`, which would point at the phone.
- */
-const getDevServerHost = (): string | null => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (!hostUri) return null;
-  const host = hostUri.replace(/^\w+:\/\//, "").split("/")[0].split(":")[0];
-  return host || null;
-};
-
-/**
- * Resolve the API base URL.
- *
- * - Set `EXPO_PUBLIC_API_URL` (e.g. in `.env`) to point at a deployed backend or
- *   a LAN address when running on a physical device.
- * - When unset, reuse the Metro dev-server host for devices/emulators on the LAN.
- * - Fall back to `10.0.2.2` for the Android emulator and `localhost` otherwise.
+ * Resolve the API base URL at bundle time. Expo inlines EXPO_PUBLIC_* values
+ * into native builds; refusing to fall back prevents a production APK from
+ * silently targeting a development host.
  */
 const getBaseUrl = (): string => {
   const configured = process.env.EXPO_PUBLIC_API_URL;
-  if (configured && configured.trim()) {
-    return configured.trim().replace(/\/+$/, "");
+  if (!configured?.trim()) {
+    throw new Error("EXPO_PUBLIC_API_URL must be configured before building the app.");
   }
 
-  if (Platform.OS !== "web") {
-    const devHost = getDevServerHost();
-    if (devHost && devHost !== "localhost" && devHost !== "127.0.0.1") {
-      return `http://${devHost}:${API_PORT}/api`;
-    }
+  const baseUrl = configured.trim().replace(/\/+$/, "");
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(baseUrl);
+  } catch {
+    throw new Error("EXPO_PUBLIC_API_URL must be an absolute HTTP(S) URL.");
   }
 
-  const host = Platform.OS === "android" ? "10.0.2.2" : "localhost";
-  return `http://${host}:${API_PORT}/api`;
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error("EXPO_PUBLIC_API_URL must use HTTP or HTTPS.");
+  }
+
+  if (
+    !__DEV__ &&
+    (parsedUrl.protocol !== "https:" ||
+      parsedUrl.hostname === "localhost" ||
+      parsedUrl.hostname === "127.0.0.1")
+  ) {
+    throw new Error("Production builds require a deployed HTTPS API URL.");
+  }
+
+  return baseUrl;
 };
 
 export const API_BASE_URL = getBaseUrl();
