@@ -34,9 +34,9 @@ const injectCsp = (env) => ({
       "script-src 'self'",
       // Inline style attributes are used by the app and Quill, so they are the
       // only inline allowance. No unsafe-eval / unsafe-inline for scripts.
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       `connect-src 'self' ${apiOrigin}`,
     ].join("; ");
     return html.replace(
