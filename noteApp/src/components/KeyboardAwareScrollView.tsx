@@ -82,6 +82,8 @@ export function KeyboardAwareScrollView({
   const focusedInputRef = useRef<TextInput | null>(null);
   const offsetRef = useRef(0);
   const keyboardHeightRef = useRef(0);
+  const initialFrameHeightRef = useRef(0);
+  const frameHeightRef = useRef(0);
   const [keyboardInset, setKeyboardInset] = useState(0);
 
   const revealFocusedInput = useCallback(() => {
@@ -96,9 +98,16 @@ export function KeyboardAwareScrollView({
         const keyboardHeight = keyboardHeightRef.current;
         const windowHeight = Dimensions.get("window").height;
         const keyboardTop = windowHeight - keyboardHeight;
-        // Bottom edge of the visible area is where the keyboard starts,
-        // unless the ScrollView does not extend that far down the screen.
-        const visibleBottom = Math.min(frameTop + frameHeight, keyboardTop);
+        const androidWindowResized =
+          Platform.OS === "android" &&
+          initialFrameHeightRef.current - frameHeightRef.current > keyboardHeight / 2;
+        // Android may resize the app window or leave it unchanged depending
+        // on the device/runtime. Use the measured frame when resized; otherwise
+        // subtract the keyboard height as on iOS.
+        const visibleBottom =
+          androidWindowResized
+            ? frameTop + frameHeight
+            : Math.min(frameTop + frameHeight, keyboardTop);
         const inputBottom = y + height + KEYBOARD_GAP;
         const target = offsetRef.current + Math.max(0, inputBottom - visibleBottom);
         if (target > offsetRef.current) {
@@ -123,19 +132,20 @@ export function KeyboardAwareScrollView({
   );
 
   useEffect(() => {
-    // Android only emits keyboardDidShow/DidHide; iOS also has Will events.
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
       keyboardHeightRef.current = event.endCoordinates.height;
-      setKeyboardInset(event.endCoordinates.height);
+      const androidWindowResized =
+        Platform.OS === "android" &&
+        initialFrameHeightRef.current - frameHeightRef.current > event.endCoordinates.height / 2;
+      setKeyboardInset(
+        Platform.OS === "ios" || !androidWindowResized ? event.endCoordinates.height : 0
+      );
       requestAnimationFrame(() => {
         requestAnimationFrame(revealFocusedInput);
       });
     });
 
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
       keyboardHeightRef.current = 0;
       setKeyboardInset(0);
       scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -158,10 +168,16 @@ export function KeyboardAwareScrollView({
           ref={scrollRef}
           style={[styles.fill, scrollProps.style]}
           contentContainerStyle={[baseContentStyle, { paddingBottom: keyboardInset }]}
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+          keyboardShouldPersistTaps="always"
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
+          onLayout={(event) => {
+            frameHeightRef.current = event.nativeEvent.layout.height;
+            if (initialFrameHeightRef.current === 0) {
+              initialFrameHeightRef.current = event.nativeEvent.layout.height;
+            }
+          }}
           onScroll={(event) => {
             offsetRef.current = event.nativeEvent.contentOffset.y;
             onScroll?.(event);
