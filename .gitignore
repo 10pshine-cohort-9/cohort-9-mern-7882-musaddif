@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+!noteApp/.env
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Coverage & analysis artifacts
+coverage/
+.nyc_output/
+.scannerwork/
