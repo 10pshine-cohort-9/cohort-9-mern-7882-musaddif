@@ -103,6 +103,7 @@ function ResetPassword() {
                         <input
                           id="reset-password"
                           type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
                           placeholder="At least 6 characters"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
@@ -127,6 +128,7 @@ function ResetPassword() {
                         <input
                           id="confirm-reset-password"
                           type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
                           placeholder="Confirm new password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}

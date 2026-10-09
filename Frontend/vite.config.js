@@ -5,16 +5,24 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// Injects a strict Content-Security-Policy meta tag into the production build.
+// Injects a Content-Security-Policy meta tag into the production build.
 // It is intentionally build-only: Vite's dev server injects an inline React
 // Fast-Refresh preamble which a strict script-src would block.
+//
+// NOTE: `frame-ancestors` is intentionally omitted here. Per the CSP spec
+// (https://w3c.github.io/webappsec-csp/#directive-frame-ancestors) browsers
+// ignore `frame-ancestors` when it is delivered via a <meta> tag — it MUST
+// arrive in an HTTP response header to take effect. Including it in a <meta>
+// tag only generates a browser console warning with no security benefit.
+// Enforce `frame-ancestors` at the hosting/CDN layer via a
+// `Content-Security-Policy` or `X-Frame-Options` response header instead.
 const injectCsp = (env) => ({
   name: "inject-csp",
   apply: "build",
   transformIndexHtml(html) {
-    // The app's API is cross-origin in dev (VITE_API_URL) and is an allowlisted
-    // remote origin in deployments, so connect-src must permit it. Relative
-    // API URLs are same-origin and covered by 'self'.
+    // The app's API is cross-origin in deployments, so connect-src must
+    // explicitly allow the API origin. Relative API URLs are same-origin and
+    // covered by 'self'.
     let apiOrigin = "'self'";
     const apiUrl = env.VITE_API_URL;
     if (apiUrl && /^https?:\/\//i.test(apiUrl.trim())) {
@@ -30,7 +38,6 @@ const injectCsp = (env) => ({
       "base-uri 'self'",
       "object-src 'none'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
       "script-src 'self'",
       // Inline style attributes are used by the app and Quill, so they are the
       // only inline allowance. No unsafe-eval / unsafe-inline for scripts.

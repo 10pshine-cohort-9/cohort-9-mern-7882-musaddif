@@ -149,6 +149,7 @@ function Signup() {
                     <input
                       id="name"
                       type="text"
+                      autoComplete="name"
                       placeholder="Enter your full name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -167,6 +168,7 @@ function Signup() {
                     <input
                       id="email"
                       type="email"
+                      autoComplete="email"
                       placeholder="Enter your email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -189,6 +191,7 @@ function Signup() {
                           ? "text"
                           : "password"
                       }
+                      autoComplete="new-password"
                       placeholder="Create a password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -224,6 +227,7 @@ function Signup() {
                           ? "text"
                           : "password"
                       }
+                      autoComplete="new-password"
                       placeholder="Confirm your password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
